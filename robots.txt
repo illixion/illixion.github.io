@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /illixion.com/
+Disallow: /blog.illixion.com/
