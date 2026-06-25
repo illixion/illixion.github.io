@@ -35,6 +35,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: updater/go.mod   # exact Go version, for reproducible output
+          cache: false                      # no go.sum (zero external modules) — skip cache
       - name: Build binaries
         run: bash updater/release.sh --publish
       - name: Attest build provenance
