@@ -134,6 +134,10 @@ uclient-fetch -O /tmp/sku "$URL"      # or: wget -O /tmp/sku "$URL"
 sha256sum /tmp/sku                     # compare to your out-of-band value
 chmod +x /tmp/sku &amp;&amp; /tmp/sku install</code></pre></div>
     </div>
+    <p class="muted">The <code class="inline">sha256</code>/<code class="inline">certutil</code>
+       step above compares against a hash you carry out-of-band. No recorded hash?
+       Verify provenance instead (any platform, needs the <code class="inline">gh</code> CLI):</p>
+    <div class="codewrap"><pre><code>gh attestation verify ssh-keys-updater-&lt;target&gt; --repo {{REPO_SLUG}}</code></pre></div>
     <p class="muted">Details: <a href="{{REPO_URL}}/blob/main/updater/INSTALL.md">install guide</a> ·
        <a href="{{REPO_URL}}/blob/main/updater/DESIGN.md">design &amp; threat model</a> ·
        <a href="{{REPO_URL}}#readme">adopt this for your own keys</a>.</p>

@@ -101,6 +101,51 @@ generate/sign-keys.sh   ─push─►  /manifest.json       ─GET─►   ssh-k
    your out-of-band value, run `./ssh-keys-updater install`. Full per-platform
    steps in [updater/INSTALL.md](updater/INSTALL.md).
 
+## Verifying a downloaded binary
+
+The binary carries the trust anchor compiled in, so confirming you have an
+authentic copy is the one step that matters. The website is untrusted — trust
+the verification, not the download. Two independent ways, strongest first:
+
+### 1. Out-of-band SHA-256 (the backstop)
+
+Build the binaries yourself once and record their hashes somewhere you control
+(a password manager, an iOS note). Builds are reproducible — `CGO_ENABLED=0`,
+`-trimpath`, fixed `-ldflags` from `config.env`, Go pinned in `go.mod`, zero
+external modules — so your local hashes match what CI serves byte-for-byte:
+
+```sh
+cd updater && ./release.sh            # builds dist/ for every target
+cat dist/SHA256SUMS                   # <- record these out-of-band
+```
+
+On a new machine, after downloading, compare:
+
+```sh
+shasum -a 256 <file>                  # macOS
+sha256sum <file>                      # Linux / OpenWRT
+certutil -hashfile <file> SHA256      # Windows (built in)
+```
+
+This check survives even a full compromise of GitHub/the host, because the
+reference value lives only with you. To re-derive the canonical hashes at any
+time, build the tagged release: `git checkout v1.0.0 && cd updater && ./release.sh`.
+
+### 2. Build provenance attestation (convenient, defense-in-depth)
+
+Every published binary has a signed SLSA attestation proving it was built by this
+repo's GitHub Actions workflow from a specific commit. With the `gh` CLI you can
+verify without any pre-recorded hash:
+
+```sh
+gh attestation verify ssh-keys-updater-macos-arm64 --repo illixion/illixion.github.io
+```
+
+This is great for first installs and adopters, but it is minted by GitHub — so it
+trusts GitHub. Treat it as defense-in-depth; the out-of-band hash (#1) remains
+the ultimate check. The manifest itself is separately signed by a hardware key,
+a stronger root than either.
+
 ## Day-to-day
 
 - **Add/remove a key:** edit the source list, run `sign-keys.sh` (serial bumps),
