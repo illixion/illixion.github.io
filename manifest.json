@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "serial": 3,
+  "issued_at": "2026-06-25T18:54:46Z",
+  "keys": [
+    "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIDLgXLu6/YO/33VWolJAlhPRtu+j7siGlkTpFLCcyWKOAAAABHNzaDo= ixion@YubiKey5-sk",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGJ6YkRbR7jmJkaecui9RqqyocizWj42zRF3usMqyChl ixion@YubiKey5-gpg",
+    "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGQfq1ifx20eJjJq9ccgU64/emo7Gbp7qVaMrhdcJszZnGvlFsNwgUUy6rcjVZvGtbC8Yf07BpIIaEo4IqAAWTc= ixion@iPhone",
+    "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNEdsvdveEtVbQodUO75Q9ptIaw5r4FZwcdCh26Xl5AronHbqpA6XRyFvuG9Bf8keehiE6WAa5zmZ3XrBu1uEyo= ixion@iPad",
+    "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGuLbqmGXf0hbteAcwrzXdWGgcRRAO43sVe6Bydal5NQA5+My4RSFS6LeyVWc2MNqBxZnyL4NAGRjHwwzv2FiS0= ixion@secretive.Pegasus",
+    "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBPNqBqV9itdMFR23QeZb/3B+eJs4PB2Wmr6+ZG6ydj0PPksmjFYwRHdXgS9IzU7PlyiyoECrTFPx33BzAzl+m3c= Personal@secretive.IxionBook",
+    "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBC0S/mEzG6nzJaMubIwG7kLSxCbnddbyPa+8mxwQv3Jeyp0g9tA1HsM8QmXOjiiwa5NPXxA1J2XgzhOJHCxtsxc= ixion@avp",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDhKX9Ler/OtQbUlo3ZggDcozle12CS9EFiKHadbXLJ0 ixion@SecureBackup"
+  ]
+}

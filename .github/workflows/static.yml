@@ -1,0 +1,55 @@
+# Build the updater binaries and deploy the site to GitHub Pages.
+#
+# Binaries are built here (not committed) so the repo stays tiny forever. Builds
+# are reproducible (-trimpath, fixed -ldflags from config.env, pinned Go via
+# go.mod), so the SHA-256 you record out-of-band matches what's served. Only the
+# page, the signed manifest, and the fresh binaries are published — not the
+# source or .git.
+name: Deploy to Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  attestations: write   # sign SLSA build provenance for the binaries
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # tags, so release.sh's version matches a local build
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: updater/go.mod   # exact Go version, for reproducible output
+      - name: Build binaries
+        run: bash updater/release.sh --publish
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'bin/ssh-keys-updater-*'
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp index.html manifest.json manifest.json.sig robots.txt _site/
+          cp -r bin _site/
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

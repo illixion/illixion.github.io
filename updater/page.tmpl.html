@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSH Keys | {{TITLE}}</title>
+<meta name="description" content="{{TITLE}}'s SSH public keys, distributed with end-to-end signature verification.">
+<link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'&gt;&lt;text y='14' font-size='14'&gt;🔑&lt;/text&gt;&lt;/svg&gt;">
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --fg: #1d2127; --muted: #6b7280;
+    --border: rgba(0,0,0,0.10); --code-bg: #f0f1f4; --accent: #2f6df6; --accent-fg:#fff;
+    --good: #2e7d32; --rule: #993A37;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0f1115; --card:#171a21; --fg:#e6e8ec; --muted:#9aa3af;
+      --border: rgba(255,255,255,0.12); --code-bg:#0c0e12; --accent:#5b8dff; --code-fg:#cdd3dc;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 1.5rem 1rem 4rem; background: var(--bg); color: var(--fg);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 48rem; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem 1.4rem; }
+  h1 { font-size: 1.9rem; margin: 0; text-align: center; }
+  .handle { text-align: center; color: var(--muted); margin-top: 0.2rem; }
+  h2 { font-size: 1.3rem; margin: 0 0 0.6rem; }
+  h3 { font-size: 1.02rem; margin: 1.1rem 0 0.3rem; }
+  p { margin: 0.6rem 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .muted { color: var(--muted); font-size: 0.9em; }
+  code.inline {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em;
+    background: var(--code-bg); padding: 0.1em 0.38em; border-radius: 0.4em; word-break: break-word;
+  }
+  .codewrap { position: relative; margin: 0.75rem 0; }
+  .codewrap pre {
+    margin: 0; padding: 0.9rem 1rem; background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 0.7rem; overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.84em; line-height: 1.5;
+  }
+  .copy-btn {
+    position: absolute; top: 0.5rem; right: 0.5rem; font: inherit; font-size: 0.72rem;
+    padding: 0.22rem 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem;
+    background: var(--card); color: var(--muted); cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+  .copy-btn.copied { background: var(--good); color: #fff; border-color: transparent; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem; }
+  .tab {
+    font: inherit; cursor: pointer; padding: 0.38rem 0.9rem; border-radius: 999px;
+    border: 1px solid var(--border); background: transparent; color: var(--fg);
+  }
+  .tab[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+  .panel { display: none; } .panel.active { display: block; }
+  .callout { border-left: 3px solid var(--rule); padding: 0.3rem 0 0.3rem 0.9rem; margin: 0.8rem 0; }
+  .tablewrap { overflow-x: auto; }
+  table.data { border-collapse: collapse; width: 100%; font-size: 0.84em; }
+  table.data th, table.data td {
+    text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap;
+  }
+  table.data td.hash { color: var(--muted); }
+  ul.keylist { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+  ul.keylist li { padding: 0.5rem 0; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.2rem; }
+  .badge { display: inline-block; font-size: 0.72em; font-weight: 600; padding: 0.1em 0.5em; border-radius: 999px;
+           background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); margin-right: 0.4rem; }
+  ul.keylist code { font-size: 0.76em; word-break: break-all; color: var(--muted); }
+  footer { text-align: center; color: var(--muted); font-size: 0.9em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <h1>🔑 {{TITLE}} · SSH Keys</h1>
+    <div class="handle">{{HANDLE}}</div>
+  </div>
+
+  <div class="card">
+    <h2>What this is</h2>
+    <p>These are the public keys authorized to log into my machines, distributed
+       with <b>end-to-end signature verification</b>. A small updater fetches a
+       signed manifest and checks it against a hardware-backed key <i>before</i>
+       touching <code class="inline">authorized_keys</code>.</p>
+    <p>So it doesn't matter if this website, its CDN, or its host are compromised:
+       a tampered file is rejected, because the signing key never leaves a YubiKey
+       and an offline backup. Don't <code class="inline">curl</code> the raw list
+       into <code class="inline">authorized_keys</code> — use the updater.</p>
+  </div>
+
+  <div class="card">
+    <h2>Install the updater</h2>
+    <p>Download → verify the checksum → run <code class="inline">install</code>
+       (schedules periodic checks and updates immediately).</p>
+    <div class="tabs" role="tablist" id="os-tabs">
+      <button class="tab" role="tab" data-os="macos">macOS</button>
+      <button class="tab" role="tab" data-os="linux">Linux</button>
+      <button class="tab" role="tab" data-os="windows">Windows</button>
+      <button class="tab" role="tab" data-os="openwrt">OpenWRT</button>
+    </div>
+
+    <div class="panel" data-os="macos">
+      <div class="codewrap"><pre><code># target: macos-arm64 (Apple Silicon) or macos-amd64 (Intel)
+URL={{BASE_URL}}/bin/ssh-keys-updater-macos-arm64
+curl -fLo sku "$URL"
+shasum -a 256 sku            # compare to your out-of-band value
+chmod +x sku &amp;&amp; ./sku install</code></pre></div>
+    </div>
+    <div class="panel" data-os="linux">
+      <div class="codewrap"><pre><code># target: linux-amd64 or linux-arm64
+URL={{BASE_URL}}/bin/ssh-keys-updater-linux-amd64
+curl -fLo sku "$URL"
+sha256sum sku               # compare to your out-of-band value
+chmod +x sku &amp;&amp; ./sku install</code></pre></div>
+    </div>
+    <div class="panel" data-os="windows">
+      <p class="muted">Run from an <b>elevated</b> PowerShell — the admin keys file
+         lives in <code class="inline">C:\ProgramData\ssh</code>.</p>
+      <div class="codewrap"><pre><code># target: windows-amd64.exe or windows-arm64.exe
+$u = "{{BASE_URL}}/bin/ssh-keys-updater-windows-amd64.exe"
+curl.exe -fLo sku.exe $u
+certutil -hashfile sku.exe SHA256     # built-in; compare to your value
+.\sku.exe install</code></pre></div>
+    </div>
+    <div class="panel" data-os="openwrt">
+      <p class="muted">Installs to <code class="inline">/etc/dropbear/authorized_keys</code>; survives sysupgrade.</p>
+      <div class="codewrap"><pre><code>URL={{BASE_URL}}/bin/ssh-keys-updater-openwrt-ramips
+uclient-fetch -O /tmp/sku "$URL"      # or: wget -O /tmp/sku "$URL"
+sha256sum /tmp/sku                     # compare to your out-of-band value
+chmod +x /tmp/sku &amp;&amp; /tmp/sku install</code></pre></div>
+    </div>
+    <p class="muted">Details: <a href="{{REPO_URL}}/blob/main/updater/INSTALL.md">install guide</a> ·
+       <a href="{{REPO_URL}}/blob/main/updater/DESIGN.md">design &amp; threat model</a> ·
+       <a href="{{REPO_URL}}#readme">adopt this for your own keys</a>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Verify the download</h2>
+    <p>The updater carries the trust anchor compiled in, so getting an authentic
+       copy is the one step that matters. The website is untrusted — so don't
+       trust the download, trust the <b>checksum</b>.</p>
+    <div class="callout"><p style="margin:0">Compare the SHA-256 against a value
+       you carry <b>independently</b> — a copy on another device or a mobile note.
+       When you're at a fresh machine with only a keyboard, typing the URL by
+       hand, this is what makes the download safe: the hash, not the channel.
+       Hex is case-insensitive, so uppercase Windows output matches lowercase
+       Unix output.</p></div>
+    <div class="codewrap"><pre><code>macOS          shasum -a 256 &lt;file&gt;
+Linux / WRT    sha256sum &lt;file&gt;
+Windows        certutil -hashfile &lt;file&gt; SHA256   (built in, no install)</code></pre></div>
+    <h3>Current binary checksums</h3>
+    <p class="muted">Record these out-of-band once, then compare on every install.</p>
+    <div class="tablewrap"><table class="data" id="sums">
+      <thead><tr><th>target</th><th>sha-256</th></tr></thead>
+      <tbody><tr><td colspan="2" class="muted">loading…</td></tr></tbody>
+    </table></div>
+    <h3>Or verify build provenance</h3>
+    <p class="muted">Each binary carries a signed SLSA attestation (built by this
+       repo's CI from a known commit). With the <code class="inline">gh</code> CLI:</p>
+    <div class="codewrap"><pre><code>gh attestation verify ssh-keys-updater-macos-arm64 --repo {{REPO_SLUG}}</code></pre></div>
+    <p class="muted">Defense-in-depth — the attestation trusts GitHub, so the
+       out-of-band hash above stays the ultimate check.</p>
+  </div>
+
+  <div class="card">
+    <h2>Authorized keys</h2>
+    <p class="muted" id="manifest-meta">loading signed manifest…</p>
+    <ul class="keylist" id="keylist"></ul>
+    <p class="muted">Signed artifacts:
+       <a href="manifest.json">manifest.json</a> ·
+       <a href="manifest.json.sig">manifest.json.sig</a></p>
+  </div>
+
+  <div class="card">
+    <h2>Trust anchor</h2>
+    <p>Everything chains to these signing keys. Anyone can verify the manifest by
+       hand with OpenSSH:</p>
+    <div class="codewrap"><pre><code># save the keys below as allowed_signers, then:
+curl -fLO {{BASE_URL}}/manifest.json
+curl -fLO {{BASE_URL}}/manifest.json.sig
+ssh-keygen -Y verify -f allowed_signers -I &lt;signer&gt; \
+    -n file -s manifest.json.sig &lt; manifest.json</code></pre></div>
+    <div class="codewrap"><pre><code>{{SIGNERS_ALLOWED}}</code></pre></div>
+    <p class="muted">Fingerprints (SHA256):<br>{{SIGNERS_FP}}</p>
+  </div>
+
+  <div class="card">
+    <footer>
+      Distributed with
+      <a href="{{REPO_URL}}">ssh-keys-updater</a> — verify-then-install signed
+      SSH keys. <a href="{{REPO_URL}}#readme">Set it up for your own keys.</a>
+    </footer>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.codewrap').forEach(function (w) {
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn'; btn.textContent = 'copy'; btn.type = 'button';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(w.querySelector('code').innerText).then(function () {
+        btn.textContent = 'copied'; btn.classList.add('copied');
+        setTimeout(function () { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1500);
+      });
+    });
+    w.appendChild(btn);
+  });
+
+  (function () {
+    var tabs = Array.from(document.querySelectorAll('#os-tabs .tab'));
+    var panels = Array.from(document.querySelectorAll('.panel[data-os]'));
+    function select(os) {
+      tabs.forEach(function (t) { t.setAttribute('aria-selected', t.dataset.os === os); });
+      panels.forEach(function (p) { p.classList.toggle('active', p.dataset.os === os); });
+    }
+    tabs.forEach(function (t) { t.addEventListener('click', function () { select(t.dataset.os); }); });
+    var ua = navigator.userAgent, plat = navigator.platform || '', os = 'linux';
+    if (/Mac|iPhone|iPad/i.test(plat) || /Mac OS X/i.test(ua)) os = 'macos';
+    else if (/Win/i.test(plat) || /Windows/i.test(ua)) os = 'windows';
+    select(os);
+  })();
+
+  var ALGO = { 'ssh-ed25519': 'ed25519', 'sk-ssh-ed25519@openssh.com': 'ed25519-sk',
+               'ecdsa-sha2-nistp256': 'ecdsa-256', 'ecdsa-sha2-nistp384': 'ecdsa-384',
+               'ecdsa-sha2-nistp521': 'ecdsa-521', 'ssh-rsa': 'rsa',
+               'sk-ecdsa-sha2-nistp256@openssh.com': 'ecdsa-sk' };
+  fetch('manifest.json', { cache: 'no-store' }).then(function (r) {
+    if (!r.ok) throw new Error(r.status); return r.json();
+  }).then(function (m) {
+    document.getElementById('manifest-meta').textContent =
+      'serial ' + m.serial + ' · issued ' + m.issued_at + ' · ' + m.keys.length + ' keys';
+    var ul = document.getElementById('keylist');
+    m.keys.forEach(function (line) {
+      var parts = line.trim().split(/\s+/);
+      var algo = parts[0], comment = parts.slice(2).join(' ') || '(no label)';
+      var li = document.createElement('li');
+      var meta = document.createElement('div');
+      var b = document.createElement('span'); b.className = 'badge'; b.textContent = ALGO[algo] || algo;
+      var name = document.createElement('b'); name.textContent = comment;
+      meta.appendChild(b); meta.appendChild(name);
+      var c = document.createElement('code'); c.textContent = line.trim();
+      li.appendChild(meta); li.appendChild(c); ul.appendChild(li);
+    });
+  }).catch(function () {
+    document.getElementById('manifest-meta').textContent = 'could not load signed manifest';
+  });
+
+  fetch('bin/SHA256SUMS', { cache: 'no-store' }).then(function (r) {
+    if (!r.ok) throw new Error(r.status); return r.text();
+  }).then(function (txt) {
+    var rows = txt.trim().split('\n').map(function (l) {
+      var mm = l.trim().split(/\s+/); return { hash: mm[0], file: mm[1] || '' };
+    }).filter(function (x) { return x.file.indexOf('ssh-keys-updater-') === 0; });
+    var tb = document.querySelector('#sums tbody'); tb.innerHTML = '';
+    rows.forEach(function (x) {
+      var tr = document.createElement('tr');
+      var td1 = document.createElement('td');
+      var a = document.createElement('a'); a.href = 'bin/' + x.file;
+      a.textContent = x.file.replace('ssh-keys-updater-', ''); td1.appendChild(a);
+      var td2 = document.createElement('td'); td2.className = 'hash'; td2.textContent = x.hash;
+      tr.appendChild(td1); tr.appendChild(td2); tb.appendChild(tr);
+    });
+    if (!rows.length) tb.innerHTML = '<tr><td colspan="2" class="muted">no binaries published yet</td></tr>';
+  }).catch(function () {
+    document.querySelector('#sums tbody').innerHTML =
+      '<tr><td colspan="2" class="muted">binaries not published yet</td></tr>';
+  });
+</script>
+</body>
+</html>
