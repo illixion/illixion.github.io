@@ -56,7 +56,7 @@ echo ">> checksums"
 if [ "$PUBLISH" -eq 1 ]; then
   BIN="../bin"
   echo ""
-  echo ">> publishing to $BIN (served at $SKU_BASE_URL/bin/)"
+  echo ">> publishing binaries to $BIN/"
   mkdir -p "$BIN"
   cp "$OUT"/ssh-keys-updater-* "$OUT/SHA256SUMS" "$BIN/"
   echo "   staged $(ls "$BIN" | wc -l | tr -d ' ') files — review, then git add bin && commit && push"
