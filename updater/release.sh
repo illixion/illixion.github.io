@@ -22,19 +22,10 @@ done
 OUT="dist"
 rm -rf "$OUT"; mkdir -p "$OUT"
 
-# Bake deployment config into the binaries so `install` on a client targets the
-# right manifest URL with no flags. Edit config.env, not this file.
-[[ -f config.env ]] && source config.env
-: "${SKU_BASE_URL:=https://example.com/ssh}"; : "${SKU_TITLE:=}"; : "${SKU_HANDLE:=}"; : "${SKU_REPO_URL:=}"
-echo ">> base URL: $SKU_BASE_URL"
-
-# Values are single-quoted so titles/handles with spaces survive (the go tool
-# splits -ldflags with quote awareness).
-LDFLAGS="-s -w -X main.version=$VERSION \
-  -X 'main.defaultBaseURL=$SKU_BASE_URL' \
-  -X 'main.defaultTitle=$SKU_TITLE' \
-  -X 'main.defaultHandle=$SKU_HANDLE' \
-  -X 'main.defaultRepoURL=$SKU_REPO_URL'"
+# Only the version is baked in. The deployment location is NOT compiled in —
+# clients learn it at runtime from discovery.json (the domain is an argument),
+# so the same binary survives a host move. Trust lives in pinned_signers.
+LDFLAGS="-s -w -X main.version=$VERSION"
 
 # GOOS GOARCH [extra env] suffix
 targets=(

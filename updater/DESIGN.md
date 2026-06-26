@@ -30,14 +30,20 @@ locks you out.
 ## Components
 
 ```
-Mac (trusted)                    illixion.github.io (UNTRUSTED)         each client
+Mac (trusted)                    ssh.illixion.com (UNTRUSTED)       each client
 ─────────────                    ────────────────────────        ───────────────
-generate/sign-keys.sh   ─push─►  /manifest.json      ─GET─►  ssh-keys-updater
-  reads ssh/keys.list            /manifest.json.sig           (pinned keys
-  builds manifest                                                  compiled in)
-  signs (YubiKey/backup)                                          verify→serial→
-  self-verifies                                                   atomic install
+generate/sign-keys.sh   ─push─►  /discovery.json     ─GET─►  ssh-keys-updater <domain>
+  reads keys.list                /manifest.json               (pinned keys compiled in)
+  builds manifest                /manifest.json.sig           discover→verify→serial→
+  signs (YubiKey/backup)                                      atomic install
+  writes discovery.json
 ```
+
+The client is given a **domain** at install time. It fetches
+`<domain>/discovery.json` (untrusted — location/cadence only) to learn the
+manifest URL, then verifies the manifest against its **compiled-in** pinned keys.
+So a host move needs no rebuild, and a forged discovery.json can at worst cause a
+missed update, never a key injection. See "Runtime location" below.
 
 ### Trust anchor — `pinned_signers`
 
@@ -134,21 +140,45 @@ compiled in, so:
 
 1. `./release.sh` cross-compiles `dist/` for every target.
 2. Move the right binary to a host over a channel you already trust (an existing
-   SSH session, USB).
-3. `./ssh-keys-updater install` — registers the periodic job and runs once.
+   SSH session, USB) — or download it and verify by SHA-256 / attestation.
+3. `./ssh-keys-updater install <domain>` — fetches `<domain>/discovery.json`
+   (printed for confirmation on first use), saves the resolved location next to
+   `authorized_keys`, registers the periodic job, and runs once.
 
-The binary **never** downloads itself from the website; only the tiny signed
-manifest is fetched, on each scheduled run (default every 15 min with random
-splay so many hosts don't hit the server in a synchronized burst).
+The binary **never** downloads itself from the website; only discovery.json and
+the tiny signed manifest are fetched, on each scheduled run (default every 15 min
+with random splay so many hosts don't hit the server in a synchronized burst).
+
+## Runtime location (discovery)
+
+The deployment location is **not** compiled in — only the signing keys are. The
+client takes a domain argument and resolves the manifest like so:
+
+- `-manifest-url URL` (advanced) → use it directly, skip discovery.
+- a domain → fetch `<domain>/discovery.json`; on first use it's printed in full
+  and (on a terminal) confirmed. The resolved location is saved to
+  `.ssh-keys-updater.conf` next to `authorized_keys`.
+- no domain → read that saved config; re-fetch discovery to follow relocations,
+  falling back to the last-known manifest URL if discovery is unreachable.
+- nothing saved + a terminal → SSH-style prompts (domain, or manifest URL if
+  discovery fails). Scheduled (`-scheduled`) runs never prompt.
+
+`discovery.json` is fetched from the untrusted site, so it is **location and
+cadence only** — interval/splay are clamped to [1m, 24h], and the manifest it
+names still must carry a valid signature from a compiled-in pinned key. Worst
+case from a forged/again discovery.json: a missed update, never key injection.
+This is what lets the *same binary* survive a host move (as happened moving from
+Cloudflare Pages to GitHub Pages): just re-run with the new domain.
 
 ## Reproducible builds & CI
 
 Binaries are **not** committed — they'd bloat git history on every Go bump. The
 Pages workflow (`.github/workflows/static.yml`) builds them on each deploy and
 publishes only the page, the signed manifest, and the fresh `bin/`. This is safe
-because the build is **reproducible**: `CGO_ENABLED=0`, `-trimpath`, fixed
-`-ldflags` (from `config.env`), no external Go modules, and the Go version pinned
-in `go.mod` (CI uses `go-version-file`). The same source + version yields
+because the build is **reproducible**: `CGO_ENABLED=0`, `-trimpath`, the only
+`-ldflags` value is the version string (no baked URL/identity any more), no
+external Go modules, and the Go version pinned in `go.mod` (CI uses
+`go-version-file`). The same source + version yields
 byte-identical binaries on any host, so the SHA-256 you record from a local
 `release.sh` matches what CI serves. The out-of-band hash check, not the build
 host, remains the trust anchor for the binary. Tag releases so a local build and
@@ -186,18 +216,22 @@ verified, file installed, local file appended, ACL hardened, SSH login confirmed
 ```
 <repo root, served at the Pages URL>/
   index.html         generated self-contained page (served at /)
+  discovery.json     PUBLIC location descriptor (manifest URL, cadence, identity)
   keys.list          source key list (human-edited) the manifest is built from
   README.md          adopter guide
   manifest.json      published signed manifest          } generated by sign-keys.sh
   manifest.json.sig  detached SSHSIG                      }
+  CNAME              custom domain for GitHub Pages (ssh.illixion.com)
   bin/               binaries + SHA256SUMS — built by Pages CI on deploy, gitignored
   updater/
-    config.env       deployment config (base URL, identity, source list)
+    config.env       deployment config (base URL, identity, repo, cadence, source list)
     *.go             updater (pure stdlib: no external module deps)
+    discovery.go     fetch/parse discovery.json · resolve.go  location resolution
+    location.go      persisted .ssh-keys-updater.conf · prompt.go  interactive prompts
     pinned_signers   embedded trust anchor (the signing public keys)
     page.tmpl.html   self-contained page template (gen-page fills it)
-    generate/sign-keys.sh   build + sign + self-verify + regenerate page
-    release.sh       cross-compile matrix -> dist/ (+ SHA256SUMS)
+    generate/sign-keys.sh   build + sign + self-verify; write discovery.json + page
+    release.sh       cross-compile matrix -> dist/ (+ SHA256SUMS); bakes only version
     DESIGN.md        this file · INSTALL.md  per-platform install
 ```
 

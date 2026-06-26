@@ -9,25 +9,21 @@ import (
 // label identifies the scheduled job across all platforms.
 const label = "com.illixion.ssh-keys-updater"
 
-// runArgs reconstructs the argv the scheduler should invoke: the absolute path
-// to this binary, "run", and any non-default flags so the scheduled run behaves
-// identically to the install-time invocation.
+// runArgs reconstructs the argv the scheduler should invoke. The scheduled run
+// takes no domain/URL: it reads the saved location (.ssh-keys-updater.conf next
+// to authorized_keys), re-fetches discovery, and applies the saved splay. We
+// only need to pin the file paths and the TLS flag.
 func runArgs(cfg Config) ([]string, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return nil, err
 	}
-	args := []string{exe, "run"}
-	if cfg.ManifestURL != defaultManifestURL {
-		args = append(args, "-url", cfg.ManifestURL)
+	args := []string{exe, "run", "-scheduled",
+		"-authorized-keys", cfg.AuthorizedKeys,
+		"-local-file", cfg.LocalFile,
 	}
-	args = append(args, "-authorized-keys", cfg.AuthorizedKeys)
-	args = append(args, "-local-file", cfg.LocalFile)
 	if cfg.InsecureTLS {
 		args = append(args, "-insecure-tls")
-	}
-	if cfg.Splay > 0 {
-		args = append(args, "-splay", cfg.Splay.String())
 	}
 	return args, nil
 }

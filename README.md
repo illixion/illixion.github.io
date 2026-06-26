@@ -28,39 +28,47 @@ See [updater/DESIGN.md](updater/DESIGN.md) for the full threat model.
 ```
 Your Mac (trusted)               your website (UNTRUSTED)          your machines
 ──────────────────               ────────────────────────         ─────────────
-generate/sign-keys.sh   ─push─►  /manifest.json       ─GET─►   ssh-keys-updater
-  build manifest                 /manifest.json.sig            (pinned keys
-  sign with YubiKey                                                 compiled in)
-  + self-verify                                                    verify → check
-                                                                   serial → atomic
-                                                                   install
+generate/sign-keys.sh   ─push─►  /discovery.json      ─GET─►   ssh-keys-updater
+  build manifest                 /manifest.json                (pinned keys
+  sign with YubiKey              /manifest.json.sig             compiled in)
+  + self-verify                                                 discover → verify →
+  write discovery.json                                          serial → atomic install
 ```
 
+- **discovery.json** — a tiny PUBLIC descriptor: where the manifest lives,
+  recommended cadence, page identity. Fetched from the untrusted site, so it
+  carries **no trust material** — a forged one can only point at a different
+  manifest URL, which still must be validly signed (worst case: no update).
 - **manifest.json** — a small signed JSON: `serial`, `issued_at`, the `keys`
   list, and an optional `disable_signer` for revoking a compromised signing key.
 - **manifest.json.sig** — a detached `SSHSIG` (`ssh-keygen -Y sign`).
 - **serial** — monotonic; the updater refuses anything not strictly newer, so a
   hostile CDN can't replay an old manifest that still lists a removed key.
-- **two pinned signers** — a daily one (YubiKey) and an offline backup. Either
-  can sign; the backup can *revoke* the YubiKey remotely (and a stolen key can't
-  un-revoke itself). No expiry — keys are hardware-backed.
+- **two pinned signers** — a daily one (YubiKey) and an offline backup, compiled
+  into the binary. Either can sign; the backup can *revoke* the YubiKey remotely
+  (and a stolen key can't un-revoke itself). No expiry — keys are hardware-backed.
+- **location is runtime, trust is compile-time** — you pass the domain to
+  `install`; the binary bakes in only the signing keys, so moving the site needs
+  no rebuild.
 
 ## Layout
 
 ```
 <repo root, served at your Pages URL>/
   index.html            generated page (served at /)
+  discovery.json        PUBLIC location descriptor clients fetch first
   manifest.json[.sig]   the signed, published artifacts
   bin/                  binaries + SHA256SUMS — built by CI on deploy, NOT committed
+  CNAME                 custom domain for GitHub Pages (ssh.illixion.com)
   README.md             this file
   keys.list             YOUR source key list (authorized_keys format) — edit + re-sign
   updater/
-    config.env          deployment config: base URL, page identity, source list
+    config.env          deployment config: base URL, identity, repo, cadence, source list
     *.go                the updater (pure stdlib, no external deps)
     pinned_signers      YOUR trust anchor: the signing public keys
     page.tmpl.html      self-contained page template (gen-page fills it)
-    generate/sign-keys.sh   build + sign + self-verify the manifest (+ page)
-    release.sh          cross-compile all targets
+    generate/sign-keys.sh   build + sign + self-verify; write discovery.json + page
+    release.sh          cross-compile all targets (bakes only the version)
     DESIGN.md           threat model & internals
     INSTALL.md          per-platform download/verify/install
 ```
@@ -79,8 +87,8 @@ generate/sign-keys.sh   ─push─►  /manifest.json       ─GET─►   ssh-k
    into every binary — get it right.
 
 3. **Configure.** Edit [updater/config.env](updater/config.env) — your public
-   base URL, page title/handle, and the source key list. That one file feeds
-   both the binary build (baked in via `-ldflags`) and the signer/page generator.
+   base URL, page title/handle, source repo, cadence, and the source key list.
+   That one file feeds the signer, the page, and `discovery.json`.
 
 4. **Record the binary hashes out-of-band.** `cd updater && ./release.sh v1`
    cross-compiles all targets and writes `dist/SHA256SUMS`. Save those numbers
@@ -91,15 +99,30 @@ generate/sign-keys.sh   ─push─►  /manifest.json       ─GET─►   ssh-k
 5. **List the keys to authorize** in [keys.list](keys.list) (one SSH public key
    per line), then **sign:** `generate/sign-keys.sh` builds `manifest.json`,
    signs it through your agent (auto-finds the pinned signer; touch your key),
-   self-verifies, and regenerates `index.html`.
+   self-verifies, and writes `discovery.json` + `index.html`.
 
-6. **Publish:** commit and push. CI builds the binaries and deploys — your page
-   is live at your Pages URL (this deployment: <https://illixion.github.io>).
+6. **Publish:** commit and push. CI builds the binaries and deploys.
    Binaries are never committed, so the repo stays small.
 
 7. **Install on each machine:** download the binary, verify its SHA-256 against
-   your out-of-band value, run `./ssh-keys-updater install`. Full per-platform
+   your out-of-band value, run `./ssh-keys-updater install <your-domain>` (e.g.
+   `ssh.illixion.com`). The binary fetches `discovery.json` from that domain,
+   prints it for you to confirm, and schedules periodic runs. Full per-platform
    steps in [updater/INSTALL.md](updater/INSTALL.md).
+
+## Custom domain (GitHub Pages)
+
+This deployment serves at **https://ssh.illixion.com** via a `CNAME` file +
+DNS. To point a subdomain of your own at the Pages site:
+
+1. **DNS** (here: Cloudflare, where `illixion.com` is hosted) — add a record:
+   - Type `CNAME`, Name `ssh` (→ `ssh.illixion.com`), Target `illixion.github.io`.
+   - **Proxy status: DNS only** (grey cloud). GitHub Pages issues its own
+     Let's Encrypt cert and terminates TLS; Cloudflare's proxy would fight that.
+2. **Repo** — the `CNAME` file (containing `ssh.illixion.com`) is already in the
+   deployed site. In **Settings → Pages → Custom domain**, set `ssh.illixion.com`
+   and, once the cert is issued (minutes to ~an hour), tick **Enforce HTTPS**.
+3. Until DNS propagates, the site also stays reachable at `illixion.github.io`.
 
 ## Verifying a downloaded binary
 

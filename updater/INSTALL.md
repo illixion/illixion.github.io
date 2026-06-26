@@ -28,23 +28,30 @@ Replace the target suffix with your platform. Compare the printed hash to your
 noted value **before** running the binary. Hex is case-insensitive, so the
 uppercase output of Windows tools matches the lowercase output of the Unix ones.
 
+`install <domain>` learns where the manifest lives by fetching
+`https://<domain>/discovery.json` (printed for you to confirm on first use), then
+schedules periodic runs. The domain is **not** baked into the binary — only the
+signing keys are — so the same binary keeps working if the site ever moves; just
+re-run with the new domain. Omit the domain on a terminal and it prompts; if
+discovery can't be fetched it asks for the manifest URL directly.
+
 ### macOS / Linux
 
 ```sh
-URL=https://illixion.github.io/bin/ssh-keys-updater-macos-arm64    # pick your target
+URL=https://ssh.illixion.com/bin/ssh-keys-updater-macos-arm64    # pick your target
 curl -fLo sku "$URL"
 shasum -a 256 sku        # macOS   ── compare to your noted SHA-256
 sha256sum  sku           # Linux   ──
-chmod +x sku && ./sku install
+chmod +x sku && ./sku install ssh.illixion.com
 ```
 
 ### OpenWRT (ramips)
 
 ```sh
-URL=https://illixion.github.io/bin/ssh-keys-updater-openwrt-ramips
+URL=https://ssh.illixion.com/bin/ssh-keys-updater-openwrt-ramips
 uclient-fetch -O /tmp/sku "$URL"   # or: wget -O /tmp/sku "$URL"
 sha256sum /tmp/sku                  # busybox ── compare to your noted SHA-256
-chmod +x /tmp/sku && /tmp/sku install
+chmod +x /tmp/sku && /tmp/sku install ssh.illixion.com
 ```
 
 Installs to `/etc/dropbear/authorized_keys` and a cron entry; survives sysupgrade.
@@ -52,11 +59,11 @@ Installs to `/etc/dropbear/authorized_keys` and a cron entry; survives sysupgrad
 ### Windows (PowerShell, from an **elevated** prompt)
 
 ```powershell
-$u = "https://illixion.github.io/bin/ssh-keys-updater-windows-amd64.exe"
+$u = "https://ssh.illixion.com/bin/ssh-keys-updater-windows-amd64.exe"
 curl.exe -fLo sku.exe $u
 certutil -hashfile sku.exe SHA256          # built-in, no install ── compare
 # or:  Get-FileHash sku.exe -Algorithm SHA256
-.\sku.exe install
+.\sku.exe install ssh.illixion.com
 ```
 
 `certutil` is built into Windows, so it works on a bare machine with only a

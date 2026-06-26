@@ -45,7 +45,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp index.html manifest.json manifest.json.sig robots.txt _site/
+          cp index.html manifest.json manifest.json.sig discovery.json robots.txt CNAME _site/
           cp -r bin _site/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5

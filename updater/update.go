@@ -20,7 +20,6 @@ type Config struct {
 	LocalFile      string // appended verbatim, e.g. ~/.ssh/authorized_keys_local
 	InsecureTLS    bool   // skip TLS verification (safe: the signature gates content)
 	Timeout        time.Duration
-	Splay          time.Duration // max random pre-fetch delay (traffic desync)
 }
 
 func (c Config) sigURL() string { return c.ManifestURL + ".sig" }
@@ -159,7 +158,7 @@ func fetch(client *http.Client, url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", fmt.Sprintf("ssh-keys-updater/%s (+%s)", version, defaultBaseURL))
+	req.Header.Set("User-Agent", fmt.Sprintf("ssh-keys-updater/%s", version))
 	req.Header.Set("Cache-Control", "no-cache")
 	resp, err := client.Do(req)
 	if err != nil {

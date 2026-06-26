@@ -109,14 +109,14 @@
 URL={{BASE_URL}}/bin/ssh-keys-updater-macos-arm64
 curl -fLo sku "$URL"
 shasum -a 256 sku            # compare to your out-of-band value
-chmod +x sku &amp;&amp; ./sku install</code></pre></div>
+chmod +x sku &amp;&amp; ./sku install {{HOST}}</code></pre></div>
     </div>
     <div class="panel" data-os="linux">
       <div class="codewrap"><pre><code># target: linux-amd64 or linux-arm64
 URL={{BASE_URL}}/bin/ssh-keys-updater-linux-amd64
 curl -fLo sku "$URL"
 sha256sum sku               # compare to your out-of-band value
-chmod +x sku &amp;&amp; ./sku install</code></pre></div>
+chmod +x sku &amp;&amp; ./sku install {{HOST}}</code></pre></div>
     </div>
     <div class="panel" data-os="windows">
       <p class="muted">Run from an <b>elevated</b> PowerShell — the admin keys file
@@ -125,14 +125,14 @@ chmod +x sku &amp;&amp; ./sku install</code></pre></div>
 $u = "{{BASE_URL}}/bin/ssh-keys-updater-windows-amd64.exe"
 curl.exe -fLo sku.exe $u
 certutil -hashfile sku.exe SHA256     # built-in; compare to your value
-.\sku.exe install</code></pre></div>
+.\sku.exe install {{HOST}}</code></pre></div>
     </div>
     <div class="panel" data-os="openwrt">
       <p class="muted">Installs to <code class="inline">/etc/dropbear/authorized_keys</code>; survives sysupgrade.</p>
       <div class="codewrap"><pre><code>URL={{BASE_URL}}/bin/ssh-keys-updater-openwrt-ramips
 uclient-fetch -O /tmp/sku "$URL"      # or: wget -O /tmp/sku "$URL"
 sha256sum /tmp/sku                     # compare to your out-of-band value
-chmod +x /tmp/sku &amp;&amp; /tmp/sku install</code></pre></div>
+chmod +x /tmp/sku &amp;&amp; /tmp/sku install {{HOST}}</code></pre></div>
     </div>
     <p class="muted">The <code class="inline">sha256</code>/<code class="inline">certutil</code>
        step above compares against a hash you carry out-of-band. No recorded hash?

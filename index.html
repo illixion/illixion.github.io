@@ -106,33 +106,33 @@
 
     <div class="panel" data-os="macos">
       <div class="codewrap"><pre><code># target: macos-arm64 (Apple Silicon) or macos-amd64 (Intel)
-URL=https://illixion.github.io/bin/ssh-keys-updater-macos-arm64
+URL=https://ssh.illixion.com/bin/ssh-keys-updater-macos-arm64
 curl -fLo sku "$URL"
 shasum -a 256 sku            # compare to your out-of-band value
-chmod +x sku &amp;&amp; ./sku install</code></pre></div>
+chmod +x sku &amp;&amp; ./sku install ssh.illixion.com</code></pre></div>
     </div>
     <div class="panel" data-os="linux">
       <div class="codewrap"><pre><code># target: linux-amd64 or linux-arm64
-URL=https://illixion.github.io/bin/ssh-keys-updater-linux-amd64
+URL=https://ssh.illixion.com/bin/ssh-keys-updater-linux-amd64
 curl -fLo sku "$URL"
 sha256sum sku               # compare to your out-of-band value
-chmod +x sku &amp;&amp; ./sku install</code></pre></div>
+chmod +x sku &amp;&amp; ./sku install ssh.illixion.com</code></pre></div>
     </div>
     <div class="panel" data-os="windows">
       <p class="muted">Run from an <b>elevated</b> PowerShell — the admin keys file
          lives in <code class="inline">C:\ProgramData\ssh</code>.</p>
       <div class="codewrap"><pre><code># target: windows-amd64.exe or windows-arm64.exe
-$u = "https://illixion.github.io/bin/ssh-keys-updater-windows-amd64.exe"
+$u = "https://ssh.illixion.com/bin/ssh-keys-updater-windows-amd64.exe"
 curl.exe -fLo sku.exe $u
 certutil -hashfile sku.exe SHA256     # built-in; compare to your value
-.\sku.exe install</code></pre></div>
+.\sku.exe install ssh.illixion.com</code></pre></div>
     </div>
     <div class="panel" data-os="openwrt">
       <p class="muted">Installs to <code class="inline">/etc/dropbear/authorized_keys</code>; survives sysupgrade.</p>
-      <div class="codewrap"><pre><code>URL=https://illixion.github.io/bin/ssh-keys-updater-openwrt-ramips
+      <div class="codewrap"><pre><code>URL=https://ssh.illixion.com/bin/ssh-keys-updater-openwrt-ramips
 uclient-fetch -O /tmp/sku "$URL"      # or: wget -O /tmp/sku "$URL"
 sha256sum /tmp/sku                     # compare to your out-of-band value
-chmod +x /tmp/sku &amp;&amp; /tmp/sku install</code></pre></div>
+chmod +x /tmp/sku &amp;&amp; /tmp/sku install ssh.illixion.com</code></pre></div>
     </div>
     <p class="muted">The <code class="inline">sha256</code>/<code class="inline">certutil</code>
        step above compares against a hash you carry out-of-band. No recorded hash?
@@ -185,8 +185,8 @@ Windows        certutil -hashfile &lt;file&gt; SHA256   (built in, no install)</
     <p>Everything chains to these signing keys. Anyone can verify the manifest by
        hand with OpenSSH:</p>
     <div class="codewrap"><pre><code># save the keys below as allowed_signers, then:
-curl -fLO https://illixion.github.io/manifest.json
-curl -fLO https://illixion.github.io/manifest.json.sig
+curl -fLO https://ssh.illixion.com/manifest.json
+curl -fLO https://ssh.illixion.com/manifest.json.sig
 ssh-keygen -Y verify -f allowed_signers -I &lt;signer&gt; \
     -n file -s manifest.json.sig &lt; manifest.json</code></pre></div>
     <div class="codewrap"><pre><code>ixion@YubiKey5-gpg ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGJ6YkRbR7jmJkaecui9RqqyocizWj42zRF3usMqyChl

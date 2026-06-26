@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "base_url": "https://ssh.illixion.com",
+  "manifest_url": "https://ssh.illixion.com/manifest.json",
+  "interval": "15m",
+  "splay": "15m",
+  "title": "Ixion",
+  "handle": "@illixion",
+  "repo_url": "https://github.com/illixion/illixion.github.io"
+}

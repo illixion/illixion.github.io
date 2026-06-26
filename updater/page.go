@@ -30,6 +30,8 @@ func genPage(baseURL, title, handle, repoURL string) (string, error) {
 	repo := strings.TrimRight(repoURL, "/")
 	// "owner/name" form for `gh attestation verify --repo`.
 	repoSlug := strings.TrimPrefix(strings.TrimPrefix(repo, "https://github.com/"), "http://github.com/")
+	// bare host (no scheme) — what the user passes to `install <host>`.
+	host := strings.TrimPrefix(strings.TrimPrefix(base, "https://"), "http://")
 
 	// allowed_signers lines for the manual-verification block.
 	var allowed strings.Builder
@@ -52,6 +54,7 @@ func genPage(baseURL, title, handle, repoURL string) (string, error) {
 		"{{TITLE}}", html.EscapeString(title),
 		"{{HANDLE}}", html.EscapeString(handle),
 		"{{BASE_URL}}", html.EscapeString(base),
+		"{{HOST}}", html.EscapeString(host),
 		"{{REPO_URL}}", html.EscapeString(repo),
 		"{{REPO_SLUG}}", html.EscapeString(repoSlug),
 		"{{SIGNERS_ALLOWED}}", html.EscapeString(strings.TrimRight(allowed.String(), "\n")),

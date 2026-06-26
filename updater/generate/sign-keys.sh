@@ -158,8 +158,29 @@ while read -r identity _; do
 done < <(awk '{print $1}' "$ALLOWED")
 [[ $ok -eq 1 ]] || { echo "SELF-VERIFY FAILED — not publishing" >&2; exit 1; }
 
-# Regenerate the static page from the embedded pinned keys (page is independent
-# of serial/keys — those load client-side — but keep it in sync with pins/URL).
+# Publish discovery.json — the small PUBLIC descriptor clients fetch to learn
+# where the manifest lives and the recommended cadence. Location/convenience
+# only; never trust material (the signing keys are compiled into the binary).
+DISCOVERY="$SSH_DIR/discovery.json"
+echo ">> writing $DISCOVERY"
+python3 - "$SKU_BASE_URL" "${SKU_INTERVAL:-15m}" "${SKU_SPLAY:-15m}" "$SKU_TITLE" "$SKU_HANDLE" "$SKU_REPO_URL" >"$DISCOVERY" <<'PY'
+import json, sys
+base = sys.argv[1].rstrip("/")
+d = {
+    "schema": 1,
+    "base_url": base,
+    "manifest_url": base + "/manifest.json",
+    "interval": sys.argv[2],
+    "splay": sys.argv[3],
+    "title": sys.argv[4],
+    "handle": sys.argv[5],
+    "repo_url": sys.argv[6],
+}
+sys.stdout.write(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
+PY
+
+# Regenerate the static page (independent of serial/keys — those load
+# client-side — but keep it in sync with pins/URL/identity).
 if command -v go >/dev/null; then
   echo ">> regenerating page -> $SSH_DIR/index.html"
   ( cd "$UPDATER_DIR" && go run . gen-page \
@@ -171,5 +192,6 @@ echo ""
 echo "Wrote:"
 echo "  $MANIFEST"
 echo "  $SIG"
+echo "  $DISCOVERY"
 echo "  $SSH_DIR/index.html"
 echo "Review, then: git add -A && git commit -m 'keys: serial $serial' && git push"
