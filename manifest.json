@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "serial": 1,
-  "issued_at": "2026-06-26T12:14:01Z",
+  "serial": 2,
+  "issued_at": "2026-06-27T02:09:02Z",
   "keys": [
     "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIDLgXLu6/YO/33VWolJAlhPRtu+j7siGlkTpFLCcyWKOAAAABHNzaDo= ixion@YubiKey5-sk",
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPDFLEggFzedj9nvz0wl9AoPGXFFbT9XfgEWrAY0l7pa ixion@YubiKey5-gpg",
@@ -10,6 +10,7 @@
     "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGuLbqmGXf0hbteAcwrzXdWGgcRRAO43sVe6Bydal5NQA5+My4RSFS6LeyVWc2MNqBxZnyL4NAGRjHwwzv2FiS0= ixion@secretive.Pegasus",
     "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBPNqBqV9itdMFR23QeZb/3B+eJs4PB2Wmr6+ZG6ydj0PPksmjFYwRHdXgS9IzU7PlyiyoECrTFPx33BzAzl+m3c= Personal@secretive.IxionBook",
     "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBC0S/mEzG6nzJaMubIwG7kLSxCbnddbyPa+8mxwQv3Jeyp0g9tA1HsM8QmXOjiiwa5NPXxA1J2XgzhOJHCxtsxc= ixion@avp",
+    "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBO1PdcjVfcXKKqM15m7gP/7PNvAIFwa5hv+aX2HG35P7KfctHO+abOw075ZB7lq4ZYGJuqBv0PyB2Pk2y4rvZfo= ixion@avp-vvnc",
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDhKX9Ler/OtQbUlo3ZggDcozle12CS9EFiKHadbXLJ0 ixion@SecureBackup"
   ]
 }
