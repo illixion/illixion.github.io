@@ -32,6 +32,7 @@ func main() {
 	interval := fs.Duration("interval", 15*time.Minute, "scheduled check cadence (overrides discovery)")
 	splay := fs.Duration("splay", 0, "max random pre-fetch delay (overrides discovery)")
 	scheduled := fs.Bool("scheduled", false, "internal: set by the scheduler so the run applies splay and never prompts")
+	acceptSigner := fs.String("accept-signer", "", "at install, trust this SHA256:... signer fingerprint (adopter use; verify it out-of-band first)")
 	// gen-page flags (author side; no baked defaults):
 	baseURL := fs.String("base-url", "", "public base URL of the page/manifest/bin (gen-page)")
 	pageTitle := fs.String("title", "", "owner name shown on the page (gen-page)")
@@ -116,13 +117,50 @@ func main() {
 		if err := saveLocation(cfg.AuthorizedKeys, loc); err != nil {
 			log.Fatalf("saving config: %v", err)
 		}
-		if err := installSchedule(cfg, loc.interval()); err != nil {
+		cfg.ManifestURL = loc.ManifestURL
+		if err := ensureSignerTrusted(cfg, loc.ManifestURL, *acceptSigner, canPrompt); err != nil {
+			log.Fatalf("%v", err)
+		}
+		exe, err := currentExe()
+		if err != nil {
+			log.Fatalf("locating binary: %v", err)
+		}
+		if err := installSchedule(cfg, loc.interval(), exe); err != nil {
 			log.Fatalf("install failed: %v", err)
 		}
 		logf("scheduled every %s (splay up to %s); manifest %s — running once now",
 			loc.interval(), loc.splay(), loc.ManifestURL)
-		cfg.ManifestURL = loc.ManifestURL
 		if err := runUpdate(cfg); err != nil { // initial run is immediate (no splay)
+			log.Fatalf("initial update failed: %v", err)
+		}
+	case "system-install":
+		dest, err := systemBinPath()
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+		if err := selfInstallBinary(dest); err != nil {
+			log.Fatalf("%v", err)
+		}
+		loc, err := resolveLocation(cfg, domainArg, *manifestURL, canPrompt)
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+		applyOverrides(loc)
+		if err := saveLocation(cfg.AuthorizedKeys, loc); err != nil {
+			log.Fatalf("saving config: %v", err)
+		}
+		cfg.ManifestURL = loc.ManifestURL
+		if err := ensureSignerTrusted(cfg, loc.ManifestURL, *acceptSigner, canPrompt); err != nil {
+			log.Fatalf("%v", err)
+		}
+		// Schedule from the installed path, not the (possibly throwaway) path we
+		// were launched from, so a later rm of the download is harmless.
+		if err := installSchedule(cfg, loc.interval(), dest); err != nil {
+			log.Fatalf("install failed: %v", err)
+		}
+		logf("scheduled every %s (splay up to %s) via %s; manifest %s — running once now",
+			loc.interval(), loc.splay(), dest, loc.ManifestURL)
+		if err := runUpdate(cfg); err != nil {
 			log.Fatalf("initial update failed: %v", err)
 		}
 	case "uninstall":
@@ -145,12 +183,22 @@ func main() {
 			log.Fatalf("gen-page failed: %v", err)
 		}
 	case "print-pins":
-		pinned, err := loadPinnedSigners()
+		embedded, err := loadPinnedSigners()
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
-		for _, k := range pinned {
-			fmt.Printf("%s  %s\n", k.Fingerprint, k.Comment)
+		local, err := loadLocalPins(cfg.AuthorizedKeys)
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+		for _, k := range embedded {
+			fmt.Printf("%s  %s  [embedded]\n", k.Fingerprint, k.Comment)
+		}
+		for _, k := range local {
+			fmt.Printf("%s  %s  [local]\n", k.Fingerprint, k.Comment)
+		}
+		if len(embedded)+len(local) == 0 {
+			fmt.Println("(no trusted signers — neutral build; run `install` to accept one)")
 		}
 	case "version":
 		fmt.Printf("ssh-keys-updater %s (%s)\n", version, manifestSchemaInfo())
@@ -162,8 +210,66 @@ func main() {
 
 func manifestSchemaInfo() string { return fmt.Sprintf("manifest schema %d", manifestSchema) }
 
+// ensureSignerTrusted makes sure the deployment's manifest signer is in the
+// effective trust set before scheduling. For a first-party host (embedded pin),
+// this is a silent no-op. For an adopter on a neutral/differently-pinned build,
+// it establishes trust ONCE, interactively, with out-of-band fingerprint
+// verification (TOFU, like SSH known_hosts), then pins it locally. A non-prompt
+// context (scheduled run) never accepts a new signer — it fails closed.
+func ensureSignerTrusted(cfg Config, manifestURL, acceptSigner string, canPrompt bool) error {
+	trusted, err := effectiveSigners(cfg.AuthorizedKeys)
+	if err != nil {
+		return err
+	}
+	client := httpClient(cfg)
+	mb, err := fetch(client, manifestURL)
+	if err != nil {
+		return fmt.Errorf("fetching manifest for trust check: %w", err)
+	}
+	sb, err := fetch(client, manifestURL+".sig")
+	if err != nil {
+		return fmt.Errorf("fetching signature for trust check: %w", err)
+	}
+	// Validate the signature against the key embedded in it — proves the bytes
+	// are self-consistently signed — WITHOUT yet trusting that key.
+	signer, err := parseAndCheckSSHSIG(mb, sb)
+	if err != nil {
+		return fmt.Errorf("manifest signature is not valid: %w", err)
+	}
+	for _, k := range trusted {
+		if k.Fingerprint == signer.Fingerprint {
+			return nil // already trusted — silent first-party path
+		}
+	}
+
+	// New signer: requires explicit, out-of-band-verified acceptance.
+	if acceptSigner != "" {
+		if acceptSigner != signer.Fingerprint {
+			return fmt.Errorf("-accept-signer %s does not match the manifest's signer %s; refusing", acceptSigner, signer.Fingerprint)
+		}
+		if err := appendLocalPin(cfg.AuthorizedKeys, signer); err != nil {
+			return err
+		}
+		logf("accepted signer %s via -accept-signer", signer.Fingerprint)
+		return nil
+	}
+	if !canPrompt {
+		return fmt.Errorf("manifest is signed by an untrusted signer %s; re-run `install` interactively, or pass -accept-signer %s after verifying it out-of-band", signer.Fingerprint, signer.Fingerprint)
+	}
+	fmt.Fprintf(os.Stderr, "\nThis deployment's manifest is signed by a signer this binary does not yet trust:\n    %s\n", signer.Fingerprint)
+	fmt.Fprintf(os.Stderr, "Verify this fingerprint out-of-band against the value the deployment publishes\n(README / release notes) — give it the same trust weight as the binary's SHA-256.\n")
+	if !confirm("Trust this signer and pin it locally?") {
+		return fmt.Errorf("signer not accepted; aborting")
+	}
+	if err := appendLocalPin(cfg.AuthorizedKeys, signer); err != nil {
+		return err
+	}
+	logf("pinned signer %s to %s", signer.Fingerprint, sidecarPath(cfg.AuthorizedKeys))
+	return nil
+}
+
 func verifyFiles(cfg Config, manifestPath, sigPath string) error {
-	pinned, err := loadPinnedSigners()
+	pinned, err := effectiveSigners(cfg.AuthorizedKeys)
 	if err != nil {
 		return err
 	}
@@ -208,11 +314,17 @@ Commands:
                     an interactive prompt.
   install [domain]  Resolve + save the location, schedule a periodic run
                     (launchd/systemd/cron/schtasks), and run once. Prompts for the
-                    domain if not given and stdin is a terminal.
+                    domain if not given and stdin is a terminal. On a build whose
+                    signer is not embedded, prompts to accept it after OOB
+                    verification (or pass -accept-signer SHA256:...).
+  system-install    Like install, but first copies the binary to the canonical
+                    system path (/usr/local/bin, or Program Files on Windows) and
+                    schedules from there — so deleting the download is harmless.
+                    Needs root/Administrator.
   uninstall         Remove the scheduled run.
   verify M S        Offline-verify a local manifest+sig pair.
   gen-page          Render the self-contained HTML page (-base-url required).
-  print-pins        List the pinned signer fingerprints baked into this binary.
+  print-pins        List trusted signer fingerprints (embedded + locally-accepted).
   version           Print version.
 
 Flags:

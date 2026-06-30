@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +14,41 @@ import (
 	"strings"
 	"time"
 )
+
+// appendMarkerPrefix begins the line that separates the managed key block from
+// the verbatim local file. Drift detection splits on it so edits to the local
+// file never look like tampering with the managed block.
+const appendMarkerPrefix = "\n# --- appended from "
+
+// managedPortion returns the managed key block — everything before the appended
+// local file — from a full authorized_keys body. Identical on the write path and
+// the read-back path, so their hashes are comparable.
+func managedPortion(content string) string {
+	if i := strings.Index(content, appendMarkerPrefix); i >= 0 {
+		return content[:i]
+	}
+	return content
+}
+
+func hashManaged(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// checkManagedDrift logs (does not repair) if the managed block on disk differs
+// from what the updater last wrote. Tamper-evidence only — see DESIGN.md.
+func checkManagedDrift(authorizedKeys string, sc *Sidecar) {
+	if sc.ManagedHash == "" {
+		return // nothing recorded yet (fresh install)
+	}
+	b, err := os.ReadFile(authorizedKeys)
+	if err != nil {
+		return // missing/unreadable: nothing to compare against
+	}
+	if hashManaged(managedPortion(string(b))) != sc.ManagedHash {
+		logf("WARNING: managed authorized_keys block changed outside ssh-keys-updater (since serial %d); it will be re-asserted on the next applied manifest", sc.State.Serial)
+	}
+}
 
 // Config holds the resolved runtime settings for a single update run.
 type Config struct {
@@ -40,14 +77,22 @@ func applySplay(max time.Duration) {
 // trust failure it returns an error and leaves authorized_keys untouched, so a
 // hostile or corrupt manifest can never remove access or inject a key.
 func runUpdate(cfg Config) error {
-	pinned, err := loadPinnedSigners()
+	pinned, err := effectiveSigners(cfg.AuthorizedKeys)
 	if err != nil {
 		return err
 	}
-	state, err := loadState(cfg.AuthorizedKeys)
-	if err != nil {
-		return fmt.Errorf("loading state: %w", err)
+	if len(pinned) == 0 {
+		return fmt.Errorf("no trusted signers (none embedded and none locally accepted); run `install` to accept one")
 	}
+	sc, err := loadSidecar(cfg.AuthorizedKeys)
+	if err != nil {
+		return fmt.Errorf("loading sidecar: %w", err)
+	}
+	state := sc.State
+
+	// Tamper-evidence: note (don't repair) any out-of-band edit to the managed
+	// block since our last write. Runs regardless of whether we end up writing.
+	checkManagedDrift(cfg.AuthorizedKeys, sc)
 
 	client := httpClient(cfg)
 	manifestBytes, err := fetch(client, cfg.ManifestURL)
@@ -101,7 +146,7 @@ func runUpdate(cfg Config) error {
 		return fmt.Errorf("reading local file: %w", err)
 	}
 	if local != "" {
-		content += "\n# --- appended from " + cfg.LocalFile + " ---\n" + local
+		content += appendMarkerPrefix + cfg.LocalFile + " ---\n" + local
 		if !strings.HasSuffix(content, "\n") {
 			content += "\n"
 		}
@@ -117,8 +162,9 @@ func runUpdate(cfg Config) error {
 		logf("warning: could not secure %s: %v", cfg.AuthorizedKeys, err)
 	}
 	state.Serial = m.Serial
-	if err := saveState(cfg.AuthorizedKeys, state); err != nil {
-		return fmt.Errorf("saving state: %w", err)
+	sc.ManagedHash = hashManaged(managedPortion(content))
+	if err := saveSidecar(cfg.AuthorizedKeys, sc); err != nil {
+		return fmt.Errorf("saving sidecar: %w", err)
 	}
 
 	logf("installed serial %d: %d key(s) -> %s", m.Serial, len(m.Keys), cfg.AuthorizedKeys)

@@ -20,3 +20,12 @@ func defaultKeyPaths() (ak, local string) {
 	}
 	return ak, filepath.Join(filepath.Dir(ak), "authorized_keys_local")
 }
+
+// systemBinPath is the canonical install location for `system-install`. On
+// OpenWRT /usr/local may be absent, so use /usr/bin (on the overlay, persistent).
+func systemBinPath() (string, error) {
+	if isOpenWRT() {
+		return "/usr/bin/ssh-keys-updater", nil
+	}
+	return "/usr/local/bin/ssh-keys-updater", nil
+}

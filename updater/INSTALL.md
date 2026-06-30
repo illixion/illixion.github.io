@@ -92,12 +92,28 @@ attestation is minted by GitHub, so it trusts GitHub; the hash you carry on a
 separate device is the one check that survives even a compromise of this repo's
 host. Use both: provenance for convenience, the recorded hash as the backstop.
 
+## Install vs. system-install
+
+`<binary> install <domain>` schedules from wherever the binary currently sits, so
+its absolute path is baked into the scheduler unit — don't run it from a temp dir
+you intend to delete. `sudo <binary> system-install <domain>` first copies the
+binary to the canonical system path (`/usr/local/bin/ssh-keys-updater`, or
+`Program Files\ssh-keys-updater\` on Windows), logs that path, and schedules from
+the installed copy — so deleting the download afterwards is harmless. Prefer
+`system-install` on machines you administer.
+
+If the binary's signer is **not** embedded (a neutral/adopter build), install
+prints the manifest signer's `SHA256:…` fingerprint and asks you to accept it —
+**verify that fingerprint out-of-band first**, the same way you verify the binary
+hash. Non-interactively, pass `-accept-signer SHA256:…`. The acceptance is stored
+in the `.ssh-keys-updater.json` sidecar next to `authorized_keys`.
+
 ## After install
 
-`<binary> install` schedules periodic checks and performs one immediately. Verify and
+Both commands schedule periodic checks and perform one immediately. Verify and
 inspect anytime:
 
 ```sh
-<binary> print-pins     # show the pinned signer fingerprints baked in
+<binary> print-pins     # show trusted signer fingerprints (embedded + locally-accepted)
 <binary> run            # force an update now
 ```

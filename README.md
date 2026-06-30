@@ -107,8 +107,24 @@ generate/sign-keys.sh   ─push─►  /discovery.json      ─GET─►   ssh-k
 7. **Install on each machine:** download the binary, verify its SHA-256 against
    your out-of-band value, run `./ssh-keys-updater install <your-domain>` (e.g.
    `ssh.illixion.com`). The binary fetches `discovery.json` from that domain,
-   prints it for you to confirm, and schedules periodic runs. Full per-platform
-   steps in [updater/INSTALL.md](updater/INSTALL.md).
+   prints it for you to confirm, and schedules periodic runs. Use
+   `sudo ./ssh-keys-updater system-install <your-domain>` to first copy the binary
+   to the system path (`/usr/local/bin`) and schedule from there — recommended, so
+   deleting the download never breaks updates. Full per-platform steps in
+   [updater/INSTALL.md](updater/INSTALL.md).
+
+### Adopting without rebuilding (neutral builds)
+
+Steps 1–2 bake *your* signer into the binary. If instead you want to reuse
+**someone else's** prebuilt binary with **your own** signer, build with an empty
+`pinned_signers` (a "neutral" build). At `install`/`system-install` the binary
+fetches the manifest, validates the signature, and prints the signer's
+`SHA256:…` fingerprint; you confirm it interactively (or pass
+`-accept-signer SHA256:…`) **after verifying it out-of-band** — the same trust
+step as the binary's SHA-256. The accepted signer is pinned locally in the
+`.ssh-keys-updater.json` sidecar; scheduled runs never accept a new signer. A
+host can serve several identities from one shared binary — install once per
+account, each accepting its own signer and domain.
 
 ## Custom domain (GitHub Pages)
 
@@ -181,12 +197,13 @@ a stronger root than either.
 ## Commands
 
 ```
-ssh-keys-updater run          # one fetch+verify+install
-ssh-keys-updater install      # schedule periodic runs + run once (-interval, -splay)
-ssh-keys-updater uninstall    # remove the schedule
-ssh-keys-updater verify M S   # offline-verify a manifest+sig
-ssh-keys-updater gen-page     # render the self-contained page (-base-url -title -handle -out)
-ssh-keys-updater print-pins   # show pinned signer fingerprints
+ssh-keys-updater run            # one fetch+verify+install
+ssh-keys-updater install        # schedule periodic runs + run once (-interval, -splay, -accept-signer)
+ssh-keys-updater system-install # copy binary to the system path, then schedule from there (root)
+ssh-keys-updater uninstall      # remove the schedule
+ssh-keys-updater verify M S     # offline-verify a manifest+sig
+ssh-keys-updater gen-page       # render the self-contained page (-base-url -title -handle -out)
+ssh-keys-updater print-pins     # show trusted signer fingerprints (embedded + locally-accepted)
 ```
 
 Licensed for anyone to adopt. No warranty — you own your keys.

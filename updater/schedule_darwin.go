@@ -25,14 +25,11 @@ func plistPath() (string, bool, error) {
 	return filepath.Join(home, "Library", "LaunchAgents", label+".plist"), false, nil
 }
 
-func installSchedule(cfg Config, interval time.Duration) error {
+func installSchedule(cfg Config, interval time.Duration, exe string) error {
 	if err := validateInterval(interval); err != nil {
 		return err
 	}
-	args, err := runArgs(cfg)
-	if err != nil {
-		return err
-	}
+	args := runArgs(cfg, exe)
 	path, isDaemon, err := plistPath()
 	if err != nil {
 		return err

@@ -1,18 +1,14 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"time"
 )
 
-// Location is the resolved, non-secret "where do I fetch from" config written at
-// install time next to authorized_keys. Scheduled (non-interactive) runs read it
-// so they never need to prompt. It is convenience/location only — trust lives in
-// the compiled-in pinned_signers, never here.
+// Location is the resolved, non-secret "where do I fetch from" config. It is
+// persisted inside the unified sidecar (see sidecar.go). Scheduled
+// (non-interactive) runs read it so they never need to prompt. It is
+// convenience/location only — trust lives in the compiled-in pinned_signers (and
+// any OOB-accepted local pins), never here.
 type Location struct {
 	DiscoveryURL string `json:"discovery_url,omitempty"` // re-fetched each run to follow relocations
 	ManifestURL  string `json:"manifest_url"`            // last good manifest URL (fallback if discovery is down)
@@ -20,31 +16,21 @@ type Location struct {
 	Splay        string `json:"splay,omitempty"`
 }
 
-func locationPath(authorizedKeys string) string {
-	return filepath.Join(filepath.Dir(authorizedKeys), ".ssh-keys-updater.conf")
-}
-
 func loadLocation(authorizedKeys string) (*Location, error) {
-	b, err := os.ReadFile(locationPath(authorizedKeys))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil // not configured yet
-	}
+	s, err := loadSidecar(authorizedKeys)
 	if err != nil {
 		return nil, err
 	}
-	var l Location
-	if err := json.Unmarshal(b, &l); err != nil {
-		return nil, err
-	}
-	return &l, nil
+	return s.Location, nil // nil if not configured yet
 }
 
 func saveLocation(authorizedKeys string, l *Location) error {
-	b, err := json.MarshalIndent(l, "", "  ")
+	s, err := loadSidecar(authorizedKeys)
 	if err != nil {
 		return err
 	}
-	return atomicWrite(locationPath(authorizedKeys), append(b, '\n'), 0o600)
+	s.Location = l
+	return saveSidecar(authorizedKeys, s)
 }
 
 func (l *Location) interval() time.Duration {

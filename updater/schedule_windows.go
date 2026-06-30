@@ -15,14 +15,11 @@ import (
 // %USERPROFILE%\.ssh\authorized_keys by default (resolved in main).
 const taskName = "ssh-keys-updater"
 
-func installSchedule(cfg Config, interval time.Duration) error {
+func installSchedule(cfg Config, interval time.Duration, exe string) error {
 	if err := validateInterval(interval); err != nil {
 		return err
 	}
-	args, err := runArgs(cfg)
-	if err != nil {
-		return err
-	}
+	args := runArgs(cfg, exe)
 	// schtasks /tr takes a single command string; quote each argument.
 	tr := winJoin(args)
 	mins := int(interval.Minutes())

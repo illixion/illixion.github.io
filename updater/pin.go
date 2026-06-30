@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
 	_ "embed"
 	"fmt"
 	"strings"
@@ -34,10 +35,71 @@ func loadPinnedSigners() ([]*PinnedKey, error) {
 	if err := sc.Err(); err != nil {
 		return nil, err
 	}
-	if len(keys) == 0 {
-		return nil, fmt.Errorf("no pinned signers embedded in binary")
+	// An empty embedded set is allowed: a "neutral" build that an adopter pins to
+	// their own signer at install time. The non-empty requirement is enforced on
+	// the *effective* set (embedded ∪ locally-accepted) at run time.
+	return keys, nil
+}
+
+// loadLocalPins parses signer keys the operator accepted at install time, stored
+// in the sidecar's `pins` (authorized_keys line format). Absent → empty.
+func loadLocalPins(authorizedKeys string) ([]*PinnedKey, error) {
+	s, err := loadSidecar(authorizedKeys)
+	if err != nil {
+		return nil, err
+	}
+	var keys []*PinnedKey
+	for _, line := range s.Pins {
+		k, err := parseAuthorizedKey(line)
+		if err != nil {
+			return nil, fmt.Errorf("local pin: %w", err)
+		}
+		keys = append(keys, k)
 	}
 	return keys, nil
+}
+
+// effectiveSigners is the trust set used by every verification: the embedded
+// pinned signers unioned with the locally-accepted pins, deduped by fingerprint.
+func effectiveSigners(authorizedKeys string) ([]*PinnedKey, error) {
+	embedded, err := loadPinnedSigners()
+	if err != nil {
+		return nil, err
+	}
+	local, err := loadLocalPins(authorizedKeys)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	var all []*PinnedKey
+	for _, k := range append(embedded, local...) {
+		if seen[k.Fingerprint] {
+			continue
+		}
+		seen[k.Fingerprint] = true
+		all = append(all, k)
+	}
+	return all, nil
+}
+
+// appendLocalPin records a signer in the sidecar's local pin set (idempotent by
+// fingerprint). Called only after an interactive, OOB-verified acceptance.
+func appendLocalPin(authorizedKeys string, key *PinnedKey) error {
+	s, err := loadSidecar(authorizedKeys)
+	if err != nil {
+		return err
+	}
+	for _, line := range s.Pins {
+		if k, err := parseAuthorizedKey(line); err == nil && k.Fingerprint == key.Fingerprint {
+			return nil // already pinned
+		}
+	}
+	line := "ssh-ed25519 " + base64.StdEncoding.EncodeToString(key.Wire)
+	if key.Comment != "" {
+		line += " " + key.Comment
+	}
+	s.Pins = append(s.Pins, line)
+	return saveSidecar(authorizedKeys, s)
 }
 
 // resolveSigner finds the pinned key referenced by a disable_signer string,

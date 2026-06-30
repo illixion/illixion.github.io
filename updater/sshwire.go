@@ -86,6 +86,14 @@ func parseAnyPublicKey(line string) (algo string, err error) {
 	return fields[0], nil
 }
 
+// pinnedKeyFromWire builds a PinnedKey from a raw SSH wire-format ed25519 public
+// key blob (as carried inside an SSHSIG). It round-trips through
+// parseAuthorizedKey so the wire validation and fingerprint derivation stay in
+// one place. The resulting key has no comment (SSHSIG carries none).
+func pinnedKeyFromWire(pubWire []byte) (*PinnedKey, error) {
+	return parseAuthorizedKey("ssh-ed25519 " + base64.StdEncoding.EncodeToString(pubWire))
+}
+
 // parseAuthorizedKey parses a single "ssh-ed25519 <base64> [comment]" line.
 // Only ed25519 keys are accepted as signers — they are all we pin and all the
 // verifier knows how to check, which keeps the trust path to a single

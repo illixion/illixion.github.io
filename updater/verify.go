@@ -38,10 +38,32 @@ const (
 	sshsigNamespace = "file" // ssh-keygen -Y sign -n file
 )
 
-// VerifySSHSIG checks that `sig` (an armored SSHSIG) is a valid signature over
-// `message` by one of the `pinned` keys, where that key is not in `disabled`
-// (matched by fingerprint). It returns the signing key on success.
+// VerifySSHSIG checks that `sig` is a valid signature over `message` by one of
+// the `pinned` keys, where that key is not in `disabled` (matched by
+// fingerprint). It returns the *trusted* pinned key on success. This is the full
+// trust-gated check used on every run.
 func VerifySSHSIG(message, sig []byte, pinned []*PinnedKey, disabled map[string]bool) (*PinnedKey, error) {
+	sigKey, err := parseAndCheckSSHSIG(message, sig)
+	if err != nil {
+		return nil, err
+	}
+	trusted := matchPinned(sigKey.Wire, pinned)
+	if trusted == nil {
+		return nil, fmt.Errorf("signature is by an unpinned key; refusing")
+	}
+	if disabled[trusted.Fingerprint] {
+		return nil, fmt.Errorf("signer %s (%s) has been revoked; refusing", trusted.Comment, trusted.Fingerprint)
+	}
+	return trusted, nil
+}
+
+// parseAndCheckSSHSIG verifies that `sig` is a self-consistent signature over
+// `message` — i.e. it validates against the public key embedded in the SSHSIG
+// itself — and returns that signer key. It makes NO trust decision: the caller
+// decides whether to trust the returned key (used at install time to show an
+// adopter the signer fingerprint before pinning it). Trusted-path callers use
+// VerifySSHSIG instead.
+func parseAndCheckSSHSIG(message, sig []byte) (*PinnedKey, error) {
 	blob, err := dearmor(sig)
 	if err != nil {
 		return nil, err
@@ -85,13 +107,12 @@ func VerifySSHSIG(message, sig []byte, pinned []*PinnedKey, disabled map[string]
 		return nil, fmt.Errorf("signature namespace %q != %q", namespace, sshsigNamespace)
 	}
 
-	// Identify which pinned key produced this signature.
-	signer := matchPinned(pubWire, pinned)
-	if signer == nil {
-		return nil, fmt.Errorf("signature is by an unpinned key; refusing")
-	}
-	if disabled[signer.Fingerprint] {
-		return nil, fmt.Errorf("signer %s (%s) has been revoked; refusing", signer.Comment, signer.Fingerprint)
+	// Reconstruct the signer key from the public key embedded in the signature.
+	// This is the key the signature claims to be from; trust is decided by the
+	// caller (VerifySSHSIG matches it against the pinned set).
+	signer, err := pinnedKeyFromWire(pubWire)
+	if err != nil {
+		return nil, fmt.Errorf("signature public key: %w", err)
 	}
 
 	// Hash the message with the algorithm named in the signature.

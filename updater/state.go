@@ -1,15 +1,8 @@
 package main
 
-import (
-	"encoding/json"
-	"errors"
-	"io/fs"
-	"os"
-	"path/filepath"
-)
-
-// State is the small per-user record kept next to authorized_keys. It enforces
-// anti-rollback (Serial) and persists signer revocations (Disabled).
+// State is the anti-rollback + revocation record. It is persisted inside the
+// unified sidecar (see sidecar.go); loadState/saveState are thin accessors over
+// it so the rest of the code is unaware of the storage layout.
 type State struct {
 	// Serial is the highest manifest serial ever accepted. The updater refuses
 	// any manifest whose serial is not strictly greater, which blocks a hostile
@@ -23,34 +16,19 @@ type State struct {
 	Disabled map[string]bool `json:"disabled,omitempty"`
 }
 
-func statePath(authorizedKeys string) string {
-	dir := filepath.Dir(authorizedKeys)
-	return filepath.Join(dir, ".ssh-keys-updater.state")
-}
-
 func loadState(authorizedKeys string) (*State, error) {
-	b, err := os.ReadFile(statePath(authorizedKeys))
-	if errors.Is(err, fs.ErrNotExist) {
-		return &State{Disabled: map[string]bool{}}, nil
-	}
+	s, err := loadSidecar(authorizedKeys)
 	if err != nil {
 		return nil, err
 	}
-	var s State
-	if err := json.Unmarshal(b, &s); err != nil {
-		return nil, err
-	}
-	if s.Disabled == nil {
-		s.Disabled = map[string]bool{}
-	}
-	return &s, nil
+	return s.State, nil
 }
 
-func saveState(authorizedKeys string, s *State) error {
-	b, err := json.MarshalIndent(s, "", "  ")
+func saveState(authorizedKeys string, st *State) error {
+	s, err := loadSidecar(authorizedKeys)
 	if err != nil {
 		return err
 	}
-	b = append(b, '\n')
-	return atomicWrite(statePath(authorizedKeys), b, 0o600)
+	s.State = st
+	return saveSidecar(authorizedKeys, s)
 }

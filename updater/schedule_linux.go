@@ -21,14 +21,11 @@ func hasSystemd() bool {
 	return err == nil
 }
 
-func installSchedule(cfg Config, interval time.Duration) error {
+func installSchedule(cfg Config, interval time.Duration, exe string) error {
 	if err := validateInterval(interval); err != nil {
 		return err
 	}
-	args, err := runArgs(cfg)
-	if err != nil {
-		return err
-	}
+	args := runArgs(cfg, exe)
 	switch {
 	case isOpenWRT():
 		return installOpenWRTCron(args, interval)

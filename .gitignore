@@ -2,3 +2,6 @@
 updater/dist/
 bin/
 _site/
+# locally-built updater binary (CI builds the published ones into bin/)
+updater/ssh-keys-updater
+updater/ssh-keys-updater.exe

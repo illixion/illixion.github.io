@@ -28,3 +28,12 @@ func defaultKeyPaths() (ak, local string) {
 	}
 	return ak, filepath.Join(filepath.Dir(ak), "authorized_keys_local")
 }
+
+// systemBinPath is the canonical install location for `system-install`.
+func systemBinPath() (string, error) {
+	pf := os.Getenv("ProgramFiles")
+	if pf == "" {
+		pf = `C:\Program Files`
+	}
+	return filepath.Join(pf, "ssh-keys-updater", "ssh-keys-updater.exe"), nil
+}

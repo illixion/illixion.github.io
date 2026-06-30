@@ -9,15 +9,12 @@ import (
 // label identifies the scheduled job across all platforms.
 const label = "com.illixion.ssh-keys-updater"
 
-// runArgs reconstructs the argv the scheduler should invoke. The scheduled run
-// takes no domain/URL: it reads the saved location (.ssh-keys-updater.conf next
-// to authorized_keys), re-fetches discovery, and applies the saved splay. We
-// only need to pin the file paths and the TLS flag.
-func runArgs(cfg Config) ([]string, error) {
-	exe, err := os.Executable()
-	if err != nil {
-		return nil, err
-	}
+// runArgs reconstructs the argv the scheduler should invoke, using `exe` as the
+// binary path. The scheduled run takes no domain/URL: it reads the saved location
+// from the sidecar next to authorized_keys, re-fetches discovery, and applies the
+// saved splay. We only need to pin the file paths and the TLS flag. `system-install`
+// passes the installed system path so the unit references a stable location.
+func runArgs(cfg Config, exe string) []string {
 	args := []string{exe, "run", "-scheduled",
 		"-authorized-keys", cfg.AuthorizedKeys,
 		"-local-file", cfg.LocalFile,
@@ -25,8 +22,12 @@ func runArgs(cfg Config) ([]string, error) {
 	if cfg.InsecureTLS {
 		args = append(args, "-insecure-tls")
 	}
-	return args, nil
+	return args
 }
+
+// currentExe is the running binary's path, used by `install` so the scheduler
+// references wherever the binary currently sits.
+func currentExe() (string, error) { return os.Executable() }
 
 func validateInterval(d time.Duration) error {
 	if d < time.Minute {
