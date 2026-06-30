@@ -299,8 +299,14 @@ client takes a domain argument and resolves the manifest like so:
   `.ssh-keys-updater.json` sidecar next to `authorized_keys`.
 - no domain → read that saved config; re-fetch discovery to follow relocations,
   falling back to the last-known manifest URL if discovery is unreachable.
-- nothing saved + a terminal → SSH-style prompts (domain, or manifest URL if
-  discovery fails). Scheduled (`-scheduled`) runs never prompt.
+- nothing saved + a **build-time default** (`main.defaultDomain`, baked from
+  `config.env`'s `SKU_BASE_URL`) → use it, so `install`/`run` need no argument.
+  This is a convenience fallback only: it is consulted *after* a saved config (so
+  host moves still need no rebuild), an explicit argument still overrides it, and
+  it carries no trust — the manifest it leads to must still verify against a
+  trusted signer. Empty in a generic build.
+- nothing saved + no default + a terminal → SSH-style prompts (domain, or manifest
+  URL if discovery fails). Scheduled (`-scheduled`) runs never prompt.
 
 `discovery.json` is fetched from the untrusted site, so it is **location and
 cadence only** — interval/splay are clamped to [1m, 24h], and the manifest it
@@ -321,11 +327,13 @@ Binaries are **not** committed — they'd bloat git history on every Go bump. Th
 Pages workflow (`.github/workflows/static.yml`) builds them on each deploy and
 publishes only the page, the signed manifest, and the fresh `bin/`. This is safe
 because the build is **reproducible**: `CGO_ENABLED=0`, `-trimpath`, the only
-`-ldflags` value is the version string (no baked URL/identity any more), no
-external Go modules, and the Go version pinned in `go.mod` (CI uses
-`go-version-file`). The same source + version yields
-byte-identical binaries on any host, so the SHA-256 you record from a local
-`release.sh` matches what CI serves. The out-of-band hash check, not the build
+`-ldflags` values are `main.version` and `main.defaultDomain` (the latter sourced
+from `config.env`'s `SKU_BASE_URL` — a convenience default location, **not** trust
+and not a hard location; see "Runtime location"), no external Go modules, and the
+Go version pinned in `go.mod` (CI uses `go-version-file`). Both values come from
+tracked inputs (a git tag and `config.env`), so the same source + tag + config
+yields byte-identical binaries on any host, and the SHA-256 you record from a
+local `release.sh` matches what CI serves. The out-of-band hash check, not the build
 host, remains the trust anchor for the binary. Tag releases so a local build and
 the CI build resolve the same `version` string (else the embedded version
 differs and so does the hash).

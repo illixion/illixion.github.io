@@ -47,6 +47,13 @@ func resolveLocation(cfg Config, domainArg, manifestOverride string, interactive
 		return loc, nil
 	}
 
+	// Fall back to the build-time default location, if one was baked in (from
+	// config.env's SKU_BASE_URL). Convenience only: a saved config was already
+	// checked above and wins, discovery.json is still fetched, and an explicit
+	// argument overrides — so this never costs the no-rebuild host-move property.
+	if defaultDomain != "" {
+		return resolveFromDomain(client, cfg, defaultDomain, interactiveOK)
+	}
 	if !interactiveOK {
 		return nil, fmt.Errorf("no domain given and nothing configured — run `install <domain>` first")
 	}

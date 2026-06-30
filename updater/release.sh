@@ -22,10 +22,15 @@ done
 OUT="dist"
 rm -rf "$OUT"; mkdir -p "$OUT"
 
-# Only the version is baked in. The deployment location is NOT compiled in —
-# clients learn it at runtime from discovery.json (the domain is an argument),
-# so the same binary survives a host move. Trust lives in pinned_signers.
+# The version is baked in. We also bake the deployment's base URL from config.env
+# as a CONVENIENCE DEFAULT for `install`/`run` with no domain argument — it is not
+# trust and not a hard location: clients still fetch discovery.json at runtime, a
+# saved config always wins (so a host move still needs no rebuild), and an explicit
+# argument overrides it. A checkout that doesn't set SKU_BASE_URL bakes nothing.
+# Trust lives only in pinned_signers.
+DEFAULT_DOMAIN="$( . ./config.env >/dev/null 2>&1; printf '%s' "${SKU_BASE_URL:-}" )"
 LDFLAGS="-s -w -X main.version=$VERSION"
+[ -n "$DEFAULT_DOMAIN" ] && LDFLAGS="$LDFLAGS -X main.defaultDomain=$DEFAULT_DOMAIN"
 
 # GOOS GOARCH [extra env] suffix
 targets=(

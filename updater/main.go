@@ -8,12 +8,18 @@ import (
 	"time"
 )
 
-// version is the only build-time-baked value (-ldflags "-X main.version=...").
-// There is deliberately NO baked URL or identity: the deployment location is
-// supplied at runtime (a domain argument + the site's discovery.json), so a
-// host move needs no rebuild. Trust still lives at compile time, in
-// pinned_signers.
+// version is baked at build time (-ldflags "-X main.version=...").
 var version = "dev"
+
+// defaultDomain is an optional convenience baked at release time from
+// config.env's SKU_BASE_URL (-X main.defaultDomain=...). When set, `install`/`run`
+// with no domain argument and nothing configured fall back to it instead of
+// prompting. It is NOT trust and NOT a hard location: discovery.json is still
+// fetched at runtime, a saved config always takes precedence (so a host move
+// needs no rebuild), and an explicit argument overrides it. Empty in a generic
+// build — adopters bake their own via config.env. Trust still lives only in
+// pinned_signers (+ any locally-accepted pins).
+var defaultDomain = ""
 
 func logf(format string, args ...any) { log.Printf(format, args...) }
 
@@ -313,10 +319,11 @@ Commands:
                     manifest URL from <domain>/discovery.json, a saved config, or
                     an interactive prompt.
   install [domain]  Resolve + save the location, schedule a periodic run
-                    (launchd/systemd/cron/schtasks), and run once. Prompts for the
-                    domain if not given and stdin is a terminal. On a build whose
-                    signer is not embedded, prompts to accept it after OOB
-                    verification (or pass -accept-signer SHA256:...).
+                    (launchd/systemd/cron/schtasks), and run once. Uses the
+                    build-time default location if no domain is given; else prompts
+                    when stdin is a terminal. On a build whose signer is not
+                    embedded, prompts to accept it after OOB verification (or pass
+                    -accept-signer SHA256:...).
   system-install    Like install, but first copies the binary to the canonical
                     system path (/usr/local/bin, or Program Files on Windows) and
                     schedules from there — so deleting the download is harmless.
