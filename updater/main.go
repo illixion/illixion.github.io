@@ -1,3 +1,11 @@
+// Don't send EDNS0 in DNS queries. Some NAT DNS proxies (notably VMware
+// Fusion/Workstation's 172.16.x.2 resolver) return malformed answers to
+// EDNS0 queries — the OPT record is injected into the ANSWER section and
+// the A record is clobbered — which the pure-Go resolver (always active
+// under CGO_ENABLED=0) rejects as "no such host". glibc doesn't send EDNS0
+// by default either; plain-DNS responses from these proxies are well-formed.
+//go:debug netedns0=0
+
 package main
 
 import (
