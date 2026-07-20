@@ -11,9 +11,15 @@ import (
 	"time"
 )
 
-// On macOS we use launchd. A per-user LaunchAgent when running as a normal
-// user, or a LaunchDaemon when running as root (so root's authorized_keys is
-// maintained even with no GUI session).
+// On macOS we use launchd by default. A per-user LaunchAgent when running as
+// a normal user, or a LaunchDaemon when running as root (so root's
+// authorized_keys is maintained even with no GUI session). A per-user
+// LaunchAgent needs the gui/<uid> launchd domain, which only exists once that
+// user has an active Aqua (loginwindow) session — an account used only over
+// SSH (e.g. a dedicated key-management user on a shared Mac) never gets one,
+// and `launchctl bootstrap` fails with "Domain does not support specified
+// action". Pass -scheduler cron to installSchedule/system-install to use a
+// plain crontab entry instead, which runs regardless of GUI login state.
 func plistPath() (string, bool, error) {
 	if os.Geteuid() == 0 {
 		return filepath.Join("/Library/LaunchDaemons", label+".plist"), true, nil
@@ -25,11 +31,14 @@ func plistPath() (string, bool, error) {
 	return filepath.Join(home, "Library", "LaunchAgents", label+".plist"), false, nil
 }
 
-func installSchedule(cfg Config, interval time.Duration, exe string) error {
+func installSchedule(cfg Config, interval time.Duration, exe string, useCron bool) error {
 	if err := validateInterval(interval); err != nil {
 		return err
 	}
 	args := runArgs(cfg, exe)
+	if useCron {
+		return installCrontab(args, interval)
+	}
 	path, isDaemon, err := plistPath()
 	if err != nil {
 		return err
@@ -90,7 +99,9 @@ func uninstallSchedule() error {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	return nil
+	// installSchedule may have used cron even though a plist also exists from
+	// a prior run (-scheduler cron); remove any crontab entry too, best-effort.
+	return removeCrontab()
 }
 
 func xmlEscape(s string) string {

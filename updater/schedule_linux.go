@@ -21,12 +21,14 @@ func hasSystemd() bool {
 	return err == nil
 }
 
-func installSchedule(cfg Config, interval time.Duration, exe string) error {
+func installSchedule(cfg Config, interval time.Duration, exe string, useCron bool) error {
 	if err := validateInterval(interval); err != nil {
 		return err
 	}
 	args := runArgs(cfg, exe)
 	switch {
+	case useCron:
+		return installCrontab(args, interval)
 	case isOpenWRT():
 		return installOpenWRTCron(args, interval)
 	case hasSystemd():
@@ -37,11 +39,18 @@ func installSchedule(cfg Config, interval time.Duration, exe string) error {
 }
 
 func uninstallSchedule() error {
+	// Remove whichever backend is native, then also remove any crontab entry
+	// best-effort — installSchedule may have used cron even when a native
+	// backend is present (-scheduler cron), and removeCrontab is a no-op if
+	// there's no marked entry.
 	switch {
 	case isOpenWRT():
 		return removeOpenWRTCron()
 	case hasSystemd():
-		return removeSystemd()
+		if err := removeSystemd(); err != nil {
+			return err
+		}
+		return removeCrontab()
 	default:
 		return removeCrontab()
 	}
@@ -122,45 +131,6 @@ func removeSystemd() error {
 	return nil
 }
 
-// --- generic crontab ---
-
-const cronMarker = "# ssh-keys-updater"
-
-func installCrontab(args []string, interval time.Duration) error {
-	line := fmt.Sprintf("%s %s %s", cronSpec(interval), shellJoin(args), cronMarker)
-	existing, _ := exec.Command("crontab", "-l").Output()
-	var kept []string
-	for _, l := range strings.Split(string(existing), "\n") {
-		if l != "" && !strings.Contains(l, cronMarker) {
-			kept = append(kept, l)
-		}
-	}
-	kept = append(kept, line)
-	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = strings.NewReader(strings.Join(kept, "\n") + "\n")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("crontab install: %v: %s", err, out)
-	}
-	logf("installed crontab entry (%s)", cronSpec(interval))
-	return nil
-}
-
-func removeCrontab() error {
-	existing, err := exec.Command("crontab", "-l").Output()
-	if err != nil {
-		return nil // no crontab
-	}
-	var kept []string
-	for _, l := range strings.Split(string(existing), "\n") {
-		if l != "" && !strings.Contains(l, cronMarker) {
-			kept = append(kept, l)
-		}
-	}
-	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = strings.NewReader(strings.Join(kept, "\n") + "\n")
-	return cmd.Run()
-}
-
 // --- OpenWRT (busybox cron) ---
 
 func installOpenWRTCron(args []string, interval time.Duration) error {
@@ -203,17 +173,4 @@ func removeOpenWRTCron() error {
 	}
 	_ = exec.Command("/etc/init.d/cron", "restart").Run()
 	return nil
-}
-
-// shellJoin quotes args for embedding in a crontab/systemd ExecStart line.
-func shellJoin(args []string) string {
-	q := make([]string, len(args))
-	for i, a := range args {
-		if a == "" || strings.ContainsAny(a, " \t\"'\\$`") {
-			q[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
-		} else {
-			q[i] = a
-		}
-	}
-	return strings.Join(q, " ")
 }

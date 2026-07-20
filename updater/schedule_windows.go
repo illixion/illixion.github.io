@@ -15,7 +15,10 @@ import (
 // %USERPROFILE%\.ssh\authorized_keys by default (resolved in main).
 const taskName = "ssh-keys-updater"
 
-func installSchedule(cfg Config, interval time.Duration, exe string) error {
+func installSchedule(cfg Config, interval time.Duration, exe string, useCron bool) error {
+	if useCron {
+		return fmt.Errorf("-scheduler cron is not supported on Windows; use the default Scheduled Task backend")
+	}
 	if err := validateInterval(interval); err != nil {
 		return err
 	}

@@ -47,6 +47,7 @@ func main() {
 	splay := fs.Duration("splay", 0, "max random pre-fetch delay (overrides discovery)")
 	scheduled := fs.Bool("scheduled", false, "internal: set by the scheduler so the run applies splay and never prompts")
 	acceptSigner := fs.String("accept-signer", "", "at install, trust this SHA256:... signer fingerprint (adopter use; verify it out-of-band first)")
+	scheduler := fs.String("scheduler", "", "scheduler backend for install/system-install: \"cron\" forces a crontab entry instead of the OS-native scheduler (launchd/systemd/schtasks) — useful e.g. for a macOS account with no GUI login session")
 	// gen-page flags (author side; no baked defaults):
 	baseURL := fs.String("base-url", "", "public base URL of the page/manifest/bin (gen-page)")
 	pageTitle := fs.String("title", "", "owner name shown on the page (gen-page)")
@@ -98,6 +99,15 @@ func main() {
 	// runs may prompt.
 	canPrompt := interactive() && !*scheduled
 
+	var useCron bool
+	switch *scheduler {
+	case "":
+	case "cron":
+		useCron = true
+	default:
+		log.Fatalf("unknown -scheduler %q (expected \"cron\" or empty for the OS-native scheduler)", *scheduler)
+	}
+
 	// applyOverrides folds -interval/-splay flags onto a resolved location.
 	applyOverrides := func(loc *Location) {
 		if intervalSet {
@@ -139,7 +149,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("locating binary: %v", err)
 		}
-		if err := installSchedule(cfg, loc.interval(), exe); err != nil {
+		if err := installSchedule(cfg, loc.interval(), exe, useCron); err != nil {
 			log.Fatalf("install failed: %v", err)
 		}
 		logf("scheduled every %s (splay up to %s); manifest %s — running once now",
@@ -169,7 +179,7 @@ func main() {
 		}
 		// Schedule from the installed path, not the (possibly throwaway) path we
 		// were launched from, so a later rm of the download is harmless.
-		if err := installSchedule(cfg, loc.interval(), dest); err != nil {
+		if err := installSchedule(cfg, loc.interval(), dest, useCron); err != nil {
 			log.Fatalf("install failed: %v", err)
 		}
 		logf("scheduled every %s (splay up to %s) via %s; manifest %s — running once now",

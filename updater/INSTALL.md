@@ -108,6 +108,40 @@ prints the manifest signer's `SHA256:…` fingerprint and asks you to accept it 
 hash. Non-interactively, pass `-accept-signer SHA256:…`. The acceptance is stored
 in the `.ssh-keys-updater.json` sidecar next to `authorized_keys`.
 
+## Known limitation: macOS accounts with no GUI login session
+
+`install` (non-root) schedules via a per-user LaunchAgent, which requires the
+`gui/<uid>` launchd domain. That domain only exists once the account has an
+active Aqua (loginwindow) session. An account used only over SSH — e.g. a
+dedicated key-management user on a Mac whose console is logged into a
+*different* user — never gets one, so `install` fails with `launchctl
+bootstrap: ... Domain does not support specified action`.
+
+`-scheduler cron` (see below) is **not** a working fallback here either: on a
+stock macOS install, `crontab` for an account with no Terminal.app/GUI history
+fails with `crontab: Operation not permitted` — a TCC restriction, and there's
+no way to grant it non-interactively for a headless account. The `user/<uid>`
+launchd domain fails the same way (`Bootstrap failed: 5: Input/output error`).
+
+There is currently no automated scheduling that works for this exact
+combination (headless macOS account, never logged in at the console). Options:
+- Run `<binary> run` by hand (or from another host's cron/CI) as a manual/
+  periodic refresh.
+- Grant the account a real console/GUI login at least once (this provisions
+  its `gui/<uid>` domain permanently), then re-run `install`.
+- Use `system-install` as root instead — root's LaunchDaemon runs in the
+  `system` domain, which has no GUI-session dependency.
+
+## `-scheduler cron` (force crontab instead of the OS-native scheduler)
+
+`install`/`system-install` normally pick the platform-native scheduler
+(launchd on macOS, systemd or OpenWRT cron on Linux, Scheduled Tasks on
+Windows). Pass `-scheduler cron` to force a plain crontab entry instead — e.g.
+`<binary> install -scheduler cron ssh.illixion.com`. This works wherever
+`crontab` is usable by the account (most Linux setups; macOS accounts that
+have completed a normal Terminal/GUI login at least once). `uninstall` removes
+crontab entries it finds regardless of which backend installed them.
+
 ## After install
 
 Both commands schedule periodic checks and perform one immediately. Verify and

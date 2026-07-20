@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -53,4 +55,58 @@ func cronSpec(d time.Duration) string {
 		}
 		return fmt.Sprintf("0 */%d * * *", h)
 	}
+}
+
+// Generic crontab install/removal, shared by any platform whose native
+// scheduler is unavailable or explicitly overridden (-scheduler cron) — e.g.
+// a macOS account with no GUI login session, where launchd's gui/<uid>
+// domain never comes into existence.
+const cronMarker = "# ssh-keys-updater"
+
+func installCrontab(args []string, interval time.Duration) error {
+	line := fmt.Sprintf("%s %s %s", cronSpec(interval), shellJoin(args), cronMarker)
+	existing, _ := exec.Command("crontab", "-l").Output()
+	var kept []string
+	for _, l := range strings.Split(string(existing), "\n") {
+		if l != "" && !strings.Contains(l, cronMarker) {
+			kept = append(kept, l)
+		}
+	}
+	kept = append(kept, line)
+	cmd := exec.Command("crontab", "-")
+	cmd.Stdin = strings.NewReader(strings.Join(kept, "\n") + "\n")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("crontab install: %v: %s", err, out)
+	}
+	logf("installed crontab entry (%s)", cronSpec(interval))
+	return nil
+}
+
+func removeCrontab() error {
+	existing, err := exec.Command("crontab", "-l").Output()
+	if err != nil {
+		return nil // no crontab
+	}
+	var kept []string
+	for _, l := range strings.Split(string(existing), "\n") {
+		if l != "" && !strings.Contains(l, cronMarker) {
+			kept = append(kept, l)
+		}
+	}
+	cmd := exec.Command("crontab", "-")
+	cmd.Stdin = strings.NewReader(strings.Join(kept, "\n") + "\n")
+	return cmd.Run()
+}
+
+// shellJoin quotes args for embedding in a crontab/systemd ExecStart line.
+func shellJoin(args []string) string {
+	q := make([]string, len(args))
+	for i, a := range args {
+		if a == "" || strings.ContainsAny(a, " \t\"'\\$`") {
+			q[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
+		} else {
+			q[i] = a
+		}
+	}
+	return strings.Join(q, " ")
 }
