@@ -46,6 +46,13 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html manifest.json manifest.json.sig discovery.json robots.txt CNAME _site/
+          # keys.list is the human-edited source of truth in authorized_keys
+          # format. Publishing it plaintext is a temporary migration bridge so
+          # legacy `curl | authorized_keys` cron hosts (redirected here from
+          # illixion.com/ssh.keys) keep getting current keys until they move to
+          # ssh-keys-updater. It is NOT a trust anchor — the manifest is signed;
+          # this is convenience only. Drop this line once no hosts pull it.
+          cp keys.list _site/
           cp -r bin _site/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
