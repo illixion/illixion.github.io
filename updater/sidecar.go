@@ -24,6 +24,12 @@ type Sidecar struct {
 	// ManagedHash is the SHA-256 (hex) of the managed key block as last written,
 	// used for tamper-evidence drift logging. Not a security control.
 	ManagedHash string `json:"managed_hash,omitempty"`
+	// ExePath is where install/system-install put the running binary, recorded
+	// so `self-update` and `status` can find it later regardless of whether
+	// this host used a user-scope or system-scope install — no need to guess
+	// or search the filesystem. Empty on sidecars written before this field
+	// existed; self-update falls back to the invoking binary's own path then.
+	ExePath string `json:"exe_path,omitempty"`
 }
 
 func sidecarPath(authorizedKeys string) string {
@@ -92,6 +98,15 @@ func loadSidecar(authorizedKeys string) (*Sidecar, error) {
 		logf("migrated legacy config to %s", sidecarPath(authorizedKeys))
 	}
 	return s, nil
+}
+
+func saveExePath(authorizedKeys, exe string) error {
+	s, err := loadSidecar(authorizedKeys)
+	if err != nil {
+		return err
+	}
+	s.ExePath = exe
+	return saveSidecar(authorizedKeys, s)
 }
 
 func saveSidecar(authorizedKeys string, s *Sidecar) error {

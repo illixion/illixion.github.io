@@ -48,6 +48,7 @@ func main() {
 	scheduled := fs.Bool("scheduled", false, "internal: set by the scheduler so the run applies splay and never prompts")
 	acceptSigner := fs.String("accept-signer", "", "at install, trust this SHA256:... signer fingerprint (adopter use; verify it out-of-band first)")
 	scheduler := fs.String("scheduler", "", "scheduler backend for install/system-install: \"cron\" forces a crontab entry instead of the OS-native scheduler (launchd/systemd/schtasks) — useful e.g. for a macOS account with no GUI login session")
+	exeOverride := fs.String("exe", "", "self-update: installed binary path to replace, overriding the sidecar's recorded exe_path (needed only for a legacy sidecar with none recorded, when self-update isn't invoked as that binary itself)")
 	// gen-page flags (author side; no baked defaults):
 	baseURL := fs.String("base-url", "", "public base URL of the page/manifest/bin (gen-page)")
 	pageTitle := fs.String("title", "", "owner name shown on the page (gen-page)")
@@ -149,6 +150,9 @@ func main() {
 		if err != nil {
 			log.Fatalf("locating binary: %v", err)
 		}
+		if err := saveExePath(cfg.AuthorizedKeys, exe); err != nil {
+			log.Fatalf("recording exe path: %v", err)
+		}
 		if err := installSchedule(cfg, loc.interval(), exe, useCron); err != nil {
 			log.Fatalf("install failed: %v", err)
 		}
@@ -164,6 +168,9 @@ func main() {
 		}
 		if err := selfInstallBinary(dest); err != nil {
 			log.Fatalf("%v", err)
+		}
+		if err := saveExePath(cfg.AuthorizedKeys, dest); err != nil {
+			log.Fatalf("recording exe path: %v", err)
 		}
 		loc, err := resolveLocation(cfg, domainArg, *manifestURL, canPrompt)
 		if err != nil {
@@ -226,6 +233,17 @@ func main() {
 		}
 	case "version":
 		fmt.Printf("ssh-keys-updater %s (%s)\n", version, manifestSchemaInfo())
+	case "status":
+		if err := printStatus(cfg); err != nil {
+			log.Fatalf("%v", err)
+		}
+	case "self-update":
+		if len(positionals) != 1 {
+			log.Fatalf("usage: ssh-keys-updater self-update <new-binary-path>")
+		}
+		if err := selfUpdate(cfg, positionals[0], *exeOverride); err != nil {
+			log.Fatalf("self-update failed: %v", err)
+		}
 	default:
 		fs.Usage()
 		os.Exit(2)
@@ -347,6 +365,14 @@ Commands:
                     schedules from there — so deleting the download is harmless.
                     Needs root/Administrator.
   uninstall         Remove the scheduled run.
+  status            Show the resolved binary path (user- or system-scope),
+                    tracked location, and installed serial — no filesystem
+                    hunting needed.
+  self-update P     Atomically replace the installed binary with the one at
+                    path P (fetched/placed out-of-band beforehand), wherever
+                    install/system-install put it, then run it once to verify
+                    and apply immediately. Use -exe to override the target
+                    path for a legacy sidecar with none recorded.
   verify M S        Offline-verify a local manifest+sig pair.
   gen-page          Render the self-contained HTML page (-base-url required).
   print-pins        List trusted signer fingerprints (embedded + locally-accepted).
