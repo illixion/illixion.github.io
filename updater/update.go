@@ -117,9 +117,16 @@ func runUpdate(cfg Config) error {
 		return err
 	}
 
-	// 3. Anti-rollback: serial must strictly advance.
-	if m.Serial <= state.Serial {
-		return fmt.Errorf("manifest serial %d is not newer than installed serial %d; refusing (rollback protection)", m.Serial, state.Serial)
+	// 3. Anti-rollback: a strictly older serial is a genuine rollback attempt
+	// and must fail. An equal serial just means nothing changed since the last
+	// run — that's the steady-state common case on every scheduled tick, not
+	// an error, so it's a silent no-op rather than a failure.
+	if m.Serial < state.Serial {
+		return fmt.Errorf("manifest serial %d is older than installed serial %d; refusing (rollback protection)", m.Serial, state.Serial)
+	}
+	if m.Serial == state.Serial {
+		logf("manifest serial %d already installed; nothing to do", m.Serial)
+		return nil
 	}
 
 	// 4. Apply a signer revocation if the manifest carries one. This is trusted
