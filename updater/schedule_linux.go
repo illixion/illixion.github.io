@@ -79,24 +79,36 @@ Type=oneshot
 ExecStart=%s
 `, shellJoin(args))
 	// In-binary splay handles desync, so no RandomizedDelaySec here. The timer
-	// fires shortly after the service manager starts, then on the requested
-	// cadence. OnStartupSec (not OnBootSec) deliberately: OnBootSec is relative
-	// to the actual machine boot, but a --user manager can restart independent
-	// of a reboot (e.g. the installing SSH session's PAM scope tearing down
-	// before `loginctl enable-linger` takes effect, or a manager crash). If
-	// that boot-relative deadline has already passed — true for any manager
-	// restart hours/days into an uptime — OnUnitActiveSec has no prior
-	// activation of its own to count from and the timer never re-arms: stuck
-	// at infinity, silently, with no error anywhere. OnStartupSec is relative
-	// to when THIS manager instance started, so it re-arms correctly across
-	// manager restarts too. For the system-scope manager (PID1) this is
-	// equivalent to OnBootSec in practice, so using it unconditionally is safe
-	// for both install and system-install.
+	// fires shortly after the timer UNIT itself is (re)started, then on the
+	// requested cadence. OnActiveSec (not OnBootSec, and not OnStartupSec)
+	// deliberately, after getting both of those wrong first:
+	//   - OnBootSec is relative to the actual machine boot. A --user manager
+	//     can restart independent of a reboot (e.g. the installing SSH
+	//     session's PAM scope tearing down before `loginctl enable-linger`
+	//     takes effect, or a manager crash). Once that boot-relative deadline
+	//     has passed — true for any manager restart hours/days into an
+	//     uptime — OnUnitActiveSec has no prior activation of its own to
+	//     count from and the timer never re-arms: stuck at infinity,
+	//     silently, with no error anywhere. Reproduced on a live host: the
+	//     timer fired exactly once at install and then never again for two
+	//     months.
+	//   - OnStartupSec looked like the fix (relative to the manager's own
+	//     start instead of boot) but it's a single timestamp captured once
+	//     per manager process lifetime — restarting the *timer unit* later
+	//     (e.g. re-running install to roll out this very fix) does not move
+	//     it, so a deadline already in the past stays in the past forever.
+	//     Verified this does NOT self-heal a stuck install.
+	//   - OnActiveSec is relative to when the timer UNIT was last activated,
+	//     which happens both at initial install and at every later
+	//     start/restart (including whatever brings a fresh manager back up
+	//     after a crash, since it starts all WantedBy=timers.target units).
+	//     Verified live: switching to it produced an immediate, real
+	//     NextElapseUSec instead of infinity.
 	timer := fmt.Sprintf(`[Unit]
 Description=Periodic SSH authorized_keys update
 
 [Timer]
-OnStartupSec=2min
+OnActiveSec=2min
 OnUnitActiveSec=%d
 Persistent=true
 
