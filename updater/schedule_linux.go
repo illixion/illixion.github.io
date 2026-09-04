@@ -118,8 +118,17 @@ WantedBy=timers.target
 		return exec.Command("systemctl", a...)
 	}
 	_ = sc("daemon-reload").Run()
-	if out, err := sc("enable", "--now", "ssh-keys-updater.timer").CombinedOutput(); err != nil {
+	if out, err := sc("enable", "ssh-keys-updater.timer").CombinedOutput(); err != nil {
 		return fmt.Errorf("systemctl enable: %v: %s", err, out)
+	}
+	// `restart`, not `start`: an install re-run against an already-active timer
+	// (e.g. re-installing after this file changed) needs its schedule actually
+	// recomputed. `start` on a unit systemd already considers active is a
+	// no-op, so a stale timer stuck at infinity (see OnStartupSec comment
+	// above) would stay stuck even after a fresh install unless the timer is
+	// unconditionally stopped and restarted.
+	if out, err := sc("restart", "ssh-keys-updater.timer").CombinedOutput(); err != nil {
+		return fmt.Errorf("systemctl restart: %v: %s", err, out)
 	}
 	if user {
 		logf("note: for the timer to run while you are logged out, enable lingering: loginctl enable-linger %s", os.Getenv("USER"))
