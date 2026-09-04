@@ -79,12 +79,24 @@ Type=oneshot
 ExecStart=%s
 `, shellJoin(args))
 	// In-binary splay handles desync, so no RandomizedDelaySec here. The timer
-	// fires shortly after boot, then on the requested cadence.
+	// fires shortly after the service manager starts, then on the requested
+	// cadence. OnStartupSec (not OnBootSec) deliberately: OnBootSec is relative
+	// to the actual machine boot, but a --user manager can restart independent
+	// of a reboot (e.g. the installing SSH session's PAM scope tearing down
+	// before `loginctl enable-linger` takes effect, or a manager crash). If
+	// that boot-relative deadline has already passed — true for any manager
+	// restart hours/days into an uptime — OnUnitActiveSec has no prior
+	// activation of its own to count from and the timer never re-arms: stuck
+	// at infinity, silently, with no error anywhere. OnStartupSec is relative
+	// to when THIS manager instance started, so it re-arms correctly across
+	// manager restarts too. For the system-scope manager (PID1) this is
+	// equivalent to OnBootSec in practice, so using it unconditionally is safe
+	// for both install and system-install.
 	timer := fmt.Sprintf(`[Unit]
 Description=Periodic SSH authorized_keys update
 
 [Timer]
-OnBootSec=2min
+OnStartupSec=2min
 OnUnitActiveSec=%d
 Persistent=true
 
