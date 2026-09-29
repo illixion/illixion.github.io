@@ -22,6 +22,12 @@ done
 OUT="dist"
 rm -rf "$OUT"; mkdir -p "$OUT"
 
+# Build with exactly the Go version go.mod names. The go directive is only a
+# minimum, so a newer local toolchain would otherwise build with itself and
+# produce different bytes than CI (setup-go installs exactly this version).
+# Go fetches the pinned toolchain on demand, checksum-verified via sumdb.
+export GOTOOLCHAIN="go$(awk '$1 == "go" {print $2}' go.mod)"
+
 # The version is baked in. We also bake the deployment's base URL from config.env
 # as a CONVENIENCE DEFAULT for `install`/`run` with no domain argument — it is not
 # trust and not a hard location: clients still fetch discovery.json at runtime, a
