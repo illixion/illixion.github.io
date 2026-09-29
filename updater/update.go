@@ -119,12 +119,12 @@ func runUpdate(cfg Config) error {
 		managed = m.authorizedKeysContent()
 		m = nil // nothing new to record
 	default:
+		// Merge onto the installed block; the fetch error is still returned.
 		var ok bool
 		if managed, ok = installedManaged(cfg.AuthorizedKeys, sc); !ok {
 			logf("not merging %s: no verified managed block to merge it with", cfg.localFile())
 			return fetchErr
 		}
-		logf("%v; merging %s with the installed managed block", fetchErr, cfg.localFile())
 	}
 
 	content, err := assemble(managed, cfg.localFile())
