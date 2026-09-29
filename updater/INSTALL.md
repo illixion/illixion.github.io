@@ -160,5 +160,10 @@ architecture over SSH, checks its SHA-256 on arrival, and runs `self-update`
 against every installed copy it finds (the sidecar's `exe_path`, the
 scheduler unit, and the `system-install` paths), using sudo where the path
 isn't writable. Pass `--dry-run` to only report what's installed where.
+`--reinstall` additionally re-runs `install` from each updated path to rewrite
+its scheduler unit with the current installer, and repairs a dead install (a
+unit whose binary is gone, e.g. one kept in `/tmp` on OpenWRT) by running
+`system-install`. It replaces the unit, so don't use it on hosts whose units
+are hand-written.
 The binary comes from the local build, never from the site; the site's
 `bin/SHA256SUMS` is compared only as a reproducibility check.
