@@ -7,14 +7,14 @@ import (
 	"path/filepath"
 )
 
-// defaultKeyPaths resolves where to install on Windows. Windows OpenSSH sshd
+// defaultAuthorizedKeys resolves where to install on Windows. Windows OpenSSH sshd
 // uses a SINGLE file, %ProgramData%\ssh\administrators_authorized_keys, for
 // every account in the Administrators group and IGNORES per-user
 // %USERPROFILE%\.ssh\authorized_keys for those accounts. So if the OpenSSH
 // server data directory exists, we target the admin file (the common case for
 // an admin workstation). For a non-admin user account, override with
 // -authorized-keys to point at the per-user file.
-func defaultKeyPaths() (ak, local string) {
+func defaultAuthorizedKeys() (ak string) {
 	pd := os.Getenv("ProgramData")
 	if pd == "" {
 		pd = `C:\ProgramData`
@@ -26,7 +26,7 @@ func defaultKeyPaths() (ak, local string) {
 		home, _ := os.UserHomeDir()
 		ak = filepath.Join(home, ".ssh", "authorized_keys")
 	}
-	return ak, filepath.Join(filepath.Dir(ak), "authorized_keys_local")
+	return ak
 }
 
 // systemBinPath is the canonical install location for `system-install`.

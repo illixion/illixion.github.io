@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -35,11 +36,12 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.LUTC)
 	log.SetPrefix("ssh-keys-updater: ")
 
-	defaultAK, defaultLocal := defaultKeyPaths()
-
 	fs := flag.NewFlagSet("ssh-keys-updater", flag.ExitOnError)
-	ak := fs.String("authorized-keys", defaultAK, "authorized_keys file to manage")
-	local := fs.String("local-file", defaultLocal, "local key file appended verbatim after the managed block")
+	ak := fs.String("authorized-keys", defaultAuthorizedKeys(), "authorized_keys file to manage; authorized_keys_local next to it is merged in on every run")
+	// Deprecated: the local file is now always authorized_keys_local beside
+	// -authorized-keys. Still accepted so scheduler units written by older
+	// versions (which passed it explicitly) keep parsing until re-installed.
+	legacyLocal := fs.String("local-file", "", "deprecated, ignored: the local file is always authorized_keys_local next to -authorized-keys")
 	insecure := fs.Bool("insecure-tls", false, "skip TLS verification (the SSHSIG signature still gates content)")
 	timeout := fs.Duration("timeout", 30*time.Second, "HTTP timeout")
 	manifestURL := fs.String("manifest-url", "", "fetch this manifest URL directly, skipping discovery (advanced)")
@@ -88,9 +90,11 @@ func main() {
 
 	cfg := Config{
 		AuthorizedKeys: *ak,
-		LocalFile:      *local,
 		InsecureTLS:    *insecure,
 		Timeout:        *timeout,
+	}
+	if *legacyLocal != "" && filepath.Clean(*legacyLocal) != cfg.localFile() {
+		logf("warning: -local-file %s is ignored; merging %s instead (re-run install to drop the flag from the schedule)", *legacyLocal, cfg.localFile())
 	}
 	domainArg := "" // optional "ssh.illixion.com" for run/install
 	if len(positionals) > 0 {
@@ -353,7 +357,9 @@ Usage:
 Commands:
   run [domain]      Fetch, verify, and install the manifest once. Resolves the
                     manifest URL from <domain>/discovery.json, a saved config, or
-                    an interactive prompt.
+                    an interactive prompt. Every run also re-merges
+                    authorized_keys_local (next to authorized_keys), even when
+                    the serial is unchanged or the fetch fails.
   install [domain]  Resolve + save the location, schedule a periodic run
                     (launchd/systemd/cron/schtasks), and run once. Uses the
                     build-time default location if no domain is given; else prompts

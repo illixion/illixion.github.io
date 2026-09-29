@@ -74,7 +74,6 @@ func selfUpdate(cfg Config, newBinaryPath, exeOverride string) error {
 
 	args := []string{"run",
 		"-authorized-keys", cfg.AuthorizedKeys,
-		"-local-file", cfg.LocalFile,
 	}
 	if cfg.InsecureTLS {
 		args = append(args, "-insecure-tls")
@@ -109,7 +108,7 @@ func printStatus(cfg Config) error {
 	fmt.Printf("version:          %s (%s)\n", version, manifestSchemaInfo())
 	fmt.Printf("binary:           %s%s\n", exe, note)
 	fmt.Printf("authorized_keys:  %s\n", cfg.AuthorizedKeys)
-	fmt.Printf("local file:       %s\n", cfg.LocalFile)
+	fmt.Printf("local file:       %s\n", cfg.localFile())
 	if sc.Location != nil {
 		fmt.Printf("manifest url:     %s\n", sc.Location.ManifestURL)
 		fmt.Printf("interval/splay:   %s / %s\n", sc.Location.interval(), sc.Location.splay())

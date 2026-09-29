@@ -188,8 +188,9 @@ overwriting, the updater isolates the managed block on disk (everything before t
 `# --- appended from … ---` marker — so legitimate edits to `authorized_keys_local`
 never trip it) and compares its SHA-256 against `managed_hash`. A mismatch is
 **logged** as drift ("managed block changed outside ssh-keys-updater since serial
-N") and is a fleet-monitoring signal only — the next applied manifest re-asserts the
-block. This is explicitly evidence, not a control; it cannot stop the out-of-scope
+N") and is a fleet-monitoring signal only — the next verified manifest (even at an
+unchanged serial) re-asserts the block, and until then the local-file merge refuses
+to rewrite a drifted block (see *Local file*). This is explicitly evidence, not a control; it cannot stop the out-of-scope
 local-root actor, only surface that the file changed.
 
 ## Update cycle (`ssh-keys-updater run`)
@@ -197,21 +198,34 @@ local-root actor, only surface that the file changed.
 1. Fetch `manifest.json` + `.sig` (HTTPS; TLS is hygiene only — the signature is
    the authority. `-insecure-tls` exists for CA-less targets).
 2. Verify SSHSIG against a pinned, non-revoked signer. Fail → stop, touch nothing.
-3. Parse manifest. `serial > stored`? else stop (rollback).
-4. If `disable_signer` is present, record that signer as revoked (it names the
-   *other* key; a key cannot disable itself).
+3. Parse manifest. `serial < stored`? stop (rollback). `serial == stored` is the
+   steady state: the manifest is re-rendered but no new state is recorded.
+4. If `disable_signer` is present on a new serial, record that signer as revoked
+   (it names the *other* key; a key cannot disable itself).
 5. Render `managed key block` + the local file **verbatim**. Before overwriting,
    compare the on-disk managed block against `managed_hash` and log drift (above).
-6. Atomic write (temp + rename, mode 0600) over `authorized_keys`; persist state +
-   the new `managed_hash` to the sidecar.
+6. Atomic write (temp + rename, mode 0600) over `authorized_keys` — skipped when
+   the file already holds exactly that content; persist state + the new
+   `managed_hash` to the sidecar.
 
-On **any** failure the existing `authorized_keys` is left untouched — a hostile
-or corrupt manifest can at worst fail to *add* a key; it can never remove access.
+If steps 1–4 fail, the **managed block is left untouched** — a hostile or corrupt
+manifest can at worst fail to *add* a key; it can never remove access. The local
+file is still merged (below), reusing the managed block already on disk.
 
 ### Local file
 
-`~/.ssh/authorized_keys_local` is concatenated verbatim after the managed block
-and is never parsed or validated — it holds LAN/forced-command keys. Final file:
+`authorized_keys_local`, always in the same directory as the managed
+`authorized_keys` (no flag; the path is derived), is concatenated verbatim after the
+managed block and is never parsed or validated — it holds LAN/forced-command keys.
+
+It is merged on **every** run, not only when a new serial lands, so an edit (or
+deletion) shows up in `authorized_keys` on the next scheduled tick without a
+re-sign. When the manifest could not be fetched or verified, the merge reuses the
+managed block on disk, but only if it still hashes to `managed_hash`: the client
+never writes a managed block it did not itself verify. A drifted block therefore
+holds the merge back until the next verified manifest re-asserts it. An unreadable
+(as opposed to absent) local file aborts the write, since dropping it could lock
+out the keys it holds. Final file:
 
 ```
 # Managed by ssh-keys-updater ...

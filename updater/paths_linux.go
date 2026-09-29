@@ -7,18 +7,18 @@ import (
 	"path/filepath"
 )
 
-// defaultKeyPaths resolves where to install on Linux. On OpenWRT the SSH server
+// defaultAuthorizedKeys resolves where to install on Linux. On OpenWRT the SSH server
 // is dropbear, which reads /etc/dropbear/authorized_keys (a plain file — the
 // LuCI "SSH-Keys" page is just an editor for it; there is no uci entry for key
 // content). Elsewhere we use the standard per-user location.
-func defaultKeyPaths() (ak, local string) {
+func defaultAuthorizedKeys() (ak string) {
 	if isOpenWRT() {
 		ak = "/etc/dropbear/authorized_keys"
 	} else {
 		home, _ := os.UserHomeDir()
 		ak = filepath.Join(home, ".ssh", "authorized_keys")
 	}
-	return ak, filepath.Join(filepath.Dir(ak), "authorized_keys_local")
+	return ak
 }
 
 // systemBinPath is the canonical install location for `system-install`. On

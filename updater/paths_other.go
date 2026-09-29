@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 )
 
-// defaultKeyPaths resolves the standard per-user location (macOS, BSD, etc.).
-func defaultKeyPaths() (ak, local string) {
+// defaultAuthorizedKeys resolves the standard per-user location (macOS, BSD, etc.).
+func defaultAuthorizedKeys() (ak string) {
 	home, _ := os.UserHomeDir()
 	ak = filepath.Join(home, ".ssh", "authorized_keys")
-	return ak, filepath.Join(filepath.Dir(ak), "authorized_keys_local")
+	return ak
 }
 
 // systemBinPath is the canonical install location for `system-install`.

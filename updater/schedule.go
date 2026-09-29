@@ -14,12 +14,12 @@ const label = "com.illixion.ssh-keys-updater"
 // runArgs reconstructs the argv the scheduler should invoke, using `exe` as the
 // binary path. The scheduled run takes no domain/URL: it reads the saved location
 // from the sidecar next to authorized_keys, re-fetches discovery, and applies the
-// saved splay. We only need to pin the file paths and the TLS flag. `system-install`
+// saved splay. We only need to pin the authorized_keys path (the local file is
+// derived from it) and the TLS flag. `system-install`
 // passes the installed system path so the unit references a stable location.
 func runArgs(cfg Config, exe string) []string {
 	args := []string{exe, "run", "-scheduled",
 		"-authorized-keys", cfg.AuthorizedKeys,
-		"-local-file", cfg.LocalFile,
 	}
 	if cfg.InsecureTLS {
 		args = append(args, "-insecure-tls")
