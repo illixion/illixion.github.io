@@ -57,11 +57,15 @@ func uninstallSchedule() error {
 	return nil
 }
 
+// winJoin builds the /TR command line. Plain double quotes only: exec.Command
+// already escapes embedded quotes when it builds schtasks' own command line, so
+// writing \" here stored a literal backslash in the task (\"C:\...exe\"), which
+// then failed every run with 0x80070002 (file not found).
 func winJoin(args []string) string {
 	q := make([]string, len(args))
 	for i, a := range args {
-		if strings.ContainsAny(a, ` \t"`) {
-			q[i] = `\"` + strings.ReplaceAll(a, `"`, `\"`) + `\"`
+		if a == "" || strings.ContainsAny(a, " \t") {
+			q[i] = `"` + a + `"`
 		} else {
 			q[i] = a
 		}
