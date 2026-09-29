@@ -151,3 +151,14 @@ inspect anytime:
 <binary> print-pins     # show trusted signer fingerprints (embedded + locally-accepted)
 <binary> run            # force an update now
 ```
+
+## Updating an installed host
+
+From a checkout on the signing machine, `updater/update-host.sh <host>...`
+builds the current commit, uploads the binary matching each host's OS and
+architecture over SSH, checks its SHA-256 on arrival, and runs `self-update`
+against every installed copy it finds (the sidecar's `exe_path`, the
+scheduler unit, and the `system-install` paths), using sudo where the path
+isn't writable. Pass `--dry-run` to only report what's installed where.
+The binary comes from the local build, never from the site; the site's
+`bin/SHA256SUMS` is compared only as a reproducibility check.

@@ -39,6 +39,7 @@ go build .                              # build for the host
 go run . print-pins                     # show pinned fingerprints baked into this build
 go run . gen-page -base-url URL -title T -handle H -repo R -out index.html
 go run . verify manifest.json manifest.json.sig   # offline-verify the signed pair
+./update-host.sh [--dry-run] <host>...     # build + self-update sku on remote hosts (any OS, user or system install)
 ```
 
 - **No automated test suite** — there are no `*_test.go` files. Verification is the self-verify step inside `sign-keys.sh` (`ssh-keygen -Y verify` against `pinned_signers`) plus manual hardware validation. `go vet ./...` and `go build` are the available checks.
