@@ -48,7 +48,7 @@ func installSchedule(cfg Config, interval time.Duration, exe string, useCron boo
 	for _, a := range args {
 		fmt.Fprintf(&progArgs, "    <string>%s</string>\n", xmlEscape(a))
 	}
-	logPath := filepath.Join(filepath.Dir(cfg.AuthorizedKeys), ".ssh-keys-updater.log")
+	logPath := schedLogPath(cfg.AuthorizedKeys)
 
 	plist := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

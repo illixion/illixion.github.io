@@ -132,6 +132,7 @@ func main() {
 		applyOverrides(loc)
 		cfg.ManifestURL = loc.ManifestURL
 		if *scheduled { // only scheduler-invoked runs jitter; manual runs are immediate
+			rotateSchedLog(cfg.AuthorizedKeys)
 			applySplay(loc.splay())
 		}
 		if err := runUpdate(cfg); err != nil {

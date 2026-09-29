@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -25,6 +26,26 @@ func runArgs(cfg Config, exe string) []string {
 		args = append(args, "-insecure-tls")
 	}
 	return args
+}
+
+// schedLogPath is where a scheduler that captures output (launchd) sends it.
+func schedLogPath(authorizedKeys string) string {
+	return filepath.Join(filepath.Dir(authorizedKeys), ".ssh-keys-updater.log")
+}
+
+// maxSchedLog caps the scheduler log. launchd only ever appends to it, so a
+// host would otherwise grow it by ~10 MB a year, forever.
+const maxSchedLog = 1 << 20
+
+// rotateSchedLog moves an oversized scheduler log to .log.1 (replacing any
+// older one), bounding it at about twice maxSchedLog. launchd opened this run's
+// output before we started, so this run still writes to the renamed file; the
+// next run gets a fresh one. Best-effort: a failure only means no rotation.
+func rotateSchedLog(authorizedKeys string) {
+	p := schedLogPath(authorizedKeys)
+	if fi, err := os.Stat(p); err == nil && fi.Size() > maxSchedLog {
+		_ = os.Rename(p, p+".1")
+	}
 }
 
 // currentExe is the running binary's path, used by `install` so the scheduler
